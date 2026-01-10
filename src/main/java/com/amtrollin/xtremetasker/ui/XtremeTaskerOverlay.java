@@ -366,23 +366,23 @@ public class XtremeTaskerOverlay extends Overlay
         graphics.drawString(iconLabel, iconTextX, iconTextY);
 
         // Status
-        XtremeTask current = plugin.getCurrentTask();
-        TaskTier tier = plugin.getCurrentTier();
-        graphics.setColor(Color.WHITE);
-        int statusX = iconX - 180 - 8;
-        int statusY = iconY + ICON_HEIGHT - 2;
-
-        if (current == null)
-        {
-            graphics.drawString("No task", statusX, statusY);
-        }
-        else
-        {
-            String tierText = (tier != null) ? ("[" + tier.name() + "] ") : "";
-            String statusText = tierText + current.getName();
-            statusText = truncateToWidth(statusText, fm, 180);
-            graphics.drawString(statusText, statusX, statusY);
-        }
+//        XtremeTask current = plugin.getCurrentTask();
+//        TaskTier tier = plugin.getCurrentTier();
+//        graphics.setColor(Color.WHITE);
+//        int statusX = iconX - 180 - 8;
+//        int statusY = iconY + ICON_HEIGHT - 2;
+//
+//        if (current == null)
+//        {
+//            graphics.drawString("No task", statusX, statusY);
+//        }
+//        else
+//        {
+//            String tierText = (tier != null) ? ("[" + tier.name() + "] ") : "";
+//            String statusText = tierText + current.getName();
+//            statusText = truncateToWidth(statusText, fm, 180);
+//            graphics.drawString(statusText, statusX, statusY);
+//        }
 
         // ---- PANEL ----
         if (!panelOpen)
