@@ -11,6 +11,7 @@ import net.runelite.client.input.KeyListener;
 import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseAdapter;
 import net.runelite.client.input.MouseManager;
+import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -42,6 +43,23 @@ public class XtremeTaskerOverlay extends Overlay
      */
     private static final int ICON_BELOW_MINIMAP_ORB_EXTRA_Y = 18;
     private static final int ICON_ANCHOR_PAD = 4;
+
+    // ---- "Runescapy" UI theme ----
+    private static final Color UI_BG = new Color(45, 36, 24, 235);
+    private static final Color UI_EDGE_DARK = new Color(18, 14, 9, 240);
+    private static final Color UI_EDGE_LIGHT = new Color(95, 78, 46, 235);
+    private static final Color UI_GOLD = new Color(200, 170, 90, 235);
+    private static final Color UI_TEXT = new Color(235, 225, 195, 255);
+    private static final Color UI_TEXT_DIM = new Color(200, 190, 160, 200);
+
+    private static final Color TAB_ACTIVE_BG = new Color(70, 55, 33, 240);
+    private static final Color TAB_INACTIVE_BG = new Color(35, 28, 18, 235);
+
+    private static final Color BTN_ENABLED_BG = new Color(62, 52, 36, 245);
+    private static final Color BTN_DISABLED_BG = new Color(30, 25, 18, 220);
+
+    private static final Color ROW_DONE_BG = new Color(255, 255, 255, 28);
+    private static final Color ROW_LINE = new Color(255, 255, 255, 25);
 
     // Panel bounds for click-outside + dragging
     private final Rectangle panelBounds = new Rectangle();
@@ -156,7 +174,6 @@ public class XtremeTaskerOverlay extends Overlay
 
                     if (panelOpen)
                     {
-                        // Opens centered each time
                         panelXOverride = null;
                         panelYOverride = null;
                         draggingPanel = false;
@@ -173,7 +190,7 @@ public class XtremeTaskerOverlay extends Overlay
                     return e;
                 }
 
-                // Click-outside-to-close (guard against stale bounds)
+                // Click-outside-to-close
                 if (button == MouseEvent.BUTTON1
                         && panelBounds.width > 0 && panelBounds.height > 0
                         && !panelBounds.contains(p))
@@ -341,6 +358,10 @@ public class XtremeTaskerOverlay extends Overlay
             return null;
         }
 
+        // default font for UI
+        graphics.setFont(FontManager.getRunescapeSmallFont());
+        FontMetrics fm = graphics.getFontMetrics();
+
         int canvasWidth = client.getCanvasWidth();
         int canvasHeight = client.getCanvasHeight();
 
@@ -350,39 +371,14 @@ public class XtremeTaskerOverlay extends Overlay
         int iconY = iconPos.y;
 
         iconBounds.setBounds(iconX, iconY, ICON_WIDTH, ICON_HEIGHT);
+        drawBevelBox(graphics, iconBounds, new Color(40, 32, 22, 220), UI_EDGE_LIGHT, UI_EDGE_DARK);
 
-        graphics.setColor(new Color(0, 0, 0, 160));
-        graphics.fillRect(iconX, iconY, ICON_WIDTH, ICON_HEIGHT);
-
-        graphics.setColor(Color.WHITE);
-        graphics.drawRect(iconX, iconY, ICON_WIDTH, ICON_HEIGHT);
-
-        String iconLabel = "XT"; // TODO: replace with real icon later
-        FontMetrics fm = graphics.getFontMetrics();
+        graphics.setColor(UI_TEXT);
+        String iconLabel = "XT";
         int iconTextW = fm.stringWidth(iconLabel);
-        int iconTextH = fm.getAscent();
         int iconTextX = iconX + (ICON_WIDTH - iconTextW) / 2;
-        int iconTextY = iconY + (ICON_HEIGHT + iconTextH) / 2 - 2;
+        int iconTextY = centeredTextBaseline(iconBounds, fm);
         graphics.drawString(iconLabel, iconTextX, iconTextY);
-
-        // Status
-//        XtremeTask current = plugin.getCurrentTask();
-//        TaskTier tier = plugin.getCurrentTier();
-//        graphics.setColor(Color.WHITE);
-//        int statusX = iconX - 180 - 8;
-//        int statusY = iconY + ICON_HEIGHT - 2;
-//
-//        if (current == null)
-//        {
-//            graphics.drawString("No task", statusX, statusY);
-//        }
-//        else
-//        {
-//            String tierText = (tier != null) ? ("[" + tier.name() + "] ") : "";
-//            String statusText = tierText + current.getName();
-//            statusText = truncateToWidth(statusText, fm, 180);
-//            graphics.drawString(statusText, statusX, statusY);
-//        }
 
         // ---- PANEL ----
         if (!panelOpen)
@@ -393,7 +389,6 @@ public class XtremeTaskerOverlay extends Overlay
         taskRowBounds.clear();
         tierTabBounds.clear();
 
-        // Auto-size panel height based on active tab content
         int desiredPanelHeight = computeDesiredPanelHeight(activeTab);
         int panelHeight = Math.max(180, Math.min(desiredPanelHeight, canvasHeight - 40));
 
@@ -403,51 +398,70 @@ public class XtremeTaskerOverlay extends Overlay
         panelBounds.setBounds(panelX, panelY, PANEL_WIDTH, panelHeight);
 
         // Drag bar = top section
-        panelDragBarBounds.setBounds(panelX, panelY, PANEL_WIDTH, ROW_HEIGHT + PANEL_PADDING + 10);
+        panelDragBarBounds.setBounds(panelX, panelY, PANEL_WIDTH, ROW_HEIGHT + PANEL_PADDING + 12);
 
-        graphics.setColor(new Color(0, 0, 0, 200));
-        graphics.fillRoundRect(panelX, panelY, PANEL_WIDTH, panelHeight, 10, 10);
+        drawBevelBox(graphics, panelBounds, UI_BG, UI_EDGE_LIGHT, UI_EDGE_DARK);
 
-        graphics.setColor(Color.WHITE);
-        graphics.drawRoundRect(panelX, panelY, PANEL_WIDTH, panelHeight, 10, 10);
+        int cursorY = panelY + PANEL_PADDING;
 
-        int cursorY = panelY + PANEL_PADDING + fm.getAscent();
+        // ---- Header: centered + larger ----
+        Font oldFont = graphics.getFont();
+        Font headerFont = FontManager.getRunescapeBoldFont();
+        graphics.setFont(headerFont);
+        FontMetrics hfm = graphics.getFontMetrics();
 
-        graphics.drawString("Xtreme Tasker", panelX + PANEL_PADDING, cursorY);
-        cursorY += ROW_HEIGHT;
+        String title = "Xtreme Tasker";
+        int titleW = hfm.stringWidth(title);
+        int titleX = panelX + (PANEL_WIDTH - titleW) / 2;
+        int titleY = cursorY + hfm.getAscent();
+        graphics.setColor(UI_GOLD);
+        graphics.drawString(title, titleX, titleY);
 
-        // Main tabs row (3 tabs)
-        int tabsY = cursorY - fm.getAscent() + 2;
-        int tabH = ROW_HEIGHT + 4;
+        cursorY += hfm.getHeight() + 2;
 
+        graphics.setColor(new Color(UI_GOLD.getRed(), UI_GOLD.getGreen(), UI_GOLD.getBlue(), 90));
+        graphics.drawLine(panelX + PANEL_PADDING, cursorY, panelX + PANEL_WIDTH - PANEL_PADDING, cursorY);
+
+        // restore small font
+        graphics.setFont(oldFont);
+        fm = graphics.getFontMetrics();
+
+        cursorY += 6;
+
+        // ---- Main tabs row (3 tabs) ----
+        int tabH = ROW_HEIGHT + 6;
         int availableTabsW = PANEL_WIDTH - (PANEL_PADDING * 2);
-        int tabW = (availableTabsW - 8) / 3; // 2 gaps of 4px = 8
+        int tabW = (availableTabsW - 8) / 3;
 
         int tab1X = panelX + PANEL_PADDING;
         int tab2X = tab1X + tabW + 4;
         int tab3X = tab2X + tabW + 4;
 
-        currentTabBounds.setBounds(tab1X, tabsY, tabW, tabH);
-        tasksTabBounds.setBounds(tab2X, tabsY, tabW, tabH);
-        rulesTabBounds.setBounds(tab3X, tabsY, tabW, tabH);
+        Rectangle tabRowBounds = new Rectangle(panelX + PANEL_PADDING, cursorY, availableTabsW, tabH);
+        currentTabBounds.setBounds(tab1X, cursorY, tabW, tabH);
+        tasksTabBounds.setBounds(tab2X, cursorY, tabW, tabH);
+        rulesTabBounds.setBounds(tab3X, cursorY, tabW, tabH);
 
         drawTab(graphics, currentTabBounds, "Current", activeTab == MainTab.CURRENT);
         drawTab(graphics, tasksTabBounds, "Tasks", activeTab == MainTab.TASKS);
         drawTab(graphics, rulesTabBounds, "Rules", activeTab == MainTab.RULES);
 
-        cursorY += tabH + 8;
+        cursorY += tabRowBounds.height + 10;
+
+        // content start baseline
+        int textCursorY = cursorY + fm.getAscent();
 
         if (activeTab == MainTab.CURRENT)
         {
-            renderCurrentTab(graphics, fm, panelX, cursorY);
+            renderCurrentTab(graphics, fm, panelX, textCursorY);
         }
         else if (activeTab == MainTab.TASKS)
         {
-            renderTasksTab(graphics, fm, panelX, cursorY);
+            renderTasksTab(graphics, fm, panelX, textCursorY);
         }
         else
         {
-            renderRulesTab(graphics, fm, panelX, cursorY, panelHeight);
+            renderRulesTab(graphics, fm, panelX, textCursorY);
         }
 
         return new Dimension(PANEL_WIDTH, panelHeight);
@@ -459,34 +473,30 @@ public class XtremeTaskerOverlay extends Overlay
         boolean currentCompleted = current != null && plugin.isTaskCompleted(current);
 
         String currentLine;
-
         if (current == null)
         {
-            currentLine = "Current: (none)";
-        }
-        else if (plugin.isTaskCompleted(current))
-        {
-            currentLine = "Just completed: " + current.getName();
+            currentLine = "Click \"Roll task\" to get a task";
         }
         else
         {
-            currentLine = "Current: " + current.getName();
+            String tierTag = " [" + current.getTier().name() + "]";
+            currentLine = (currentCompleted ? "Just completed: " : "Current: ") + current.getName() + tierTag;
         }
 
         currentLine = truncateToWidth(currentLine, fm, PANEL_WIDTH - 2 * PANEL_PADDING);
-        g.setColor(Color.WHITE);
+        g.setColor(UI_TEXT);
         g.drawString(currentLine, panelX + PANEL_PADDING, cursorY);
 
-        cursorY += ROW_HEIGHT + 8;
+        cursorY += ROW_HEIGHT + 10;
 
         int buttonWidth = (PANEL_WIDTH - 2 * PANEL_PADDING - 6) / 2;
-        int buttonHeight = ROW_HEIGHT + 8;
+        int buttonHeight = ROW_HEIGHT + 10;
 
         int bx1 = panelX + PANEL_PADDING;
         int bx2 = bx1 + buttonWidth + 6;
 
-        completeButtonBounds.setBounds(bx1, cursorY, buttonWidth, buttonHeight);
-        rollButtonBounds.setBounds(bx2, cursorY, buttonWidth, buttonHeight);
+        completeButtonBounds.setBounds(bx1, cursorY - fm.getAscent(), buttonWidth, buttonHeight);
+        rollButtonBounds.setBounds(bx2, cursorY - fm.getAscent(), buttonWidth, buttonHeight);
 
         boolean rollEnabled = (current == null) || currentCompleted;
         boolean completeEnabled = (current != null) && !currentCompleted;
@@ -496,7 +506,7 @@ public class XtremeTaskerOverlay extends Overlay
 
         cursorY += buttonHeight + 20;
 
-        g.setColor(new Color(255, 255, 255, 170));
+        g.setColor(UI_TEXT_DIM);
         String hint = (current == null)
                 ? "Roll to get a task."
                 : (currentCompleted ? "You can roll again." : "Complete current task to roll again.");
@@ -507,45 +517,47 @@ public class XtremeTaskerOverlay extends Overlay
     private void renderTasksTab(Graphics2D g, FontMetrics fm, int panelX, int cursorY)
     {
         // Tier tabs row
-        int tierTabY = cursorY - fm.getAscent() + 2;
-        int tierTabH = ROW_HEIGHT + 4;
-
+        int tierTabH = ROW_HEIGHT + 6;
         int availableW = PANEL_WIDTH - 2 * PANEL_PADDING;
         int tierTabW = (availableW - (TIER_TABS.size() - 1) * 4) / TIER_TABS.size();
 
+        int tierTabY = cursorY - fm.getAscent();
         int x = panelX + PANEL_PADDING;
+
         for (TaskTier t : TIER_TABS)
         {
             Rectangle r = new Rectangle(x, tierTabY, tierTabW, tierTabH);
             tierTabBounds.put(t, r);
-            drawTab(g, r, prettyTier(t), t == activeTierTab);
+            drawTierTab(g, r, prettyTier(t), t == activeTierTab);
             x += tierTabW + 4;
         }
 
-        cursorY += tierTabH + 10;
+        cursorY += tierTabH + 12;
 
-        // Sort toggle row
+        // Sort toggle row (boxed)
         String sortLabel = completedFirst ? "Sort: Completed first" : "Sort: Incomplete first";
-        sortLabel = truncateToWidth(sortLabel, fm, PANEL_WIDTH - 2 * PANEL_PADDING);
+        sortLabel = truncateToWidth(sortLabel, fm, PANEL_WIDTH - 2 * PANEL_PADDING - 10);
 
         sortToggleBounds.setBounds(
                 panelX + PANEL_PADDING,
                 cursorY - fm.getAscent(),
                 PANEL_WIDTH - 2 * PANEL_PADDING,
-                ROW_HEIGHT + 2
+                ROW_HEIGHT + 8
         );
 
-        g.setColor(new Color(255, 255, 255, 200));
-        g.drawString(sortLabel, panelX + PANEL_PADDING, cursorY);
-        cursorY += ROW_HEIGHT + 6;
+        drawBevelBox(g, sortToggleBounds, TAB_INACTIVE_BG, UI_EDGE_LIGHT, UI_EDGE_DARK);
+        g.setColor(UI_TEXT_DIM);
+        g.drawString(sortLabel, sortToggleBounds.x + 6, centeredTextBaseline(sortToggleBounds, fm));
+
+        cursorY += (ROW_HEIGHT + 14);
 
         List<XtremeTask> tasks = getSortedTasksForTier(activeTierTab);
 
-        g.setColor(Color.WHITE);
+        g.setColor(UI_TEXT);
         g.drawString("Click task to toggle done:", panelX + PANEL_PADDING, cursorY);
         cursorY += ROW_HEIGHT;
 
-        int maxListHeight = panelBounds.y + panelBounds.height - cursorY - PANEL_PADDING;
+        int maxListHeight = panelBounds.y + panelBounds.height - (cursorY - fm.getAscent()) - PANEL_PADDING;
         int usedHeight = 0;
 
         for (XtremeTask task : tasks)
@@ -556,41 +568,62 @@ public class XtremeTaskerOverlay extends Overlay
             }
 
             boolean completed = plugin.isTaskCompleted(task);
-            String prefix = completed ? "[DONE] " : "[    ] ";
+
+            // Replace unsupported glyphs with ASCII checkbox markers
+            String prefix = completed ? "[X] " : "[ ] ";
             String line = prefix + task.getName();
             line = truncateToWidth(line, fm, PANEL_WIDTH - 2 * PANEL_PADDING);
 
             Rectangle rowBounds = new Rectangle(
                     panelX + PANEL_PADDING,
-                    cursorY - 2,
+                    (cursorY - fm.getAscent()) - 2,
                     PANEL_WIDTH - 2 * PANEL_PADDING,
-                    ROW_HEIGHT
+                    ROW_HEIGHT + 4
             );
             taskRowBounds.put(task, rowBounds);
 
             if (completed)
             {
-                g.setColor(new Color(255, 255, 255, 25));
+                g.setColor(ROW_DONE_BG);
                 g.fillRect(rowBounds.x, rowBounds.y, rowBounds.width, rowBounds.height);
+
+                g.setColor(ROW_LINE);
+                g.drawLine(rowBounds.x, rowBounds.y, rowBounds.x + rowBounds.width, rowBounds.y);
             }
 
-            g.setColor(Color.WHITE);
-            g.drawString(line, panelX + PANEL_PADDING, cursorY + fm.getAscent());
+            // Completed text dimmer
+            g.setColor(completed ? new Color(UI_TEXT_DIM.getRed(), UI_TEXT_DIM.getGreen(), UI_TEXT_DIM.getBlue(), 210) : UI_TEXT);
 
-            cursorY += ROW_HEIGHT;
-            usedHeight += ROW_HEIGHT;
+            int textX = panelX + PANEL_PADDING;
+            int textY = cursorY;
+
+            g.drawString(line, textX, textY);
+
+            // Strikethrough completed tasks (across task name portion)
+            if (completed)
+            {
+                int prefixW = fm.stringWidth(prefix);
+                int nameW = fm.stringWidth(truncateToWidth(task.getName(), fm, PANEL_WIDTH - 2 * PANEL_PADDING - prefixW));
+                int strikeY = textY - (fm.getAscent() / 2) + 1;
+
+                g.setColor(new Color(UI_TEXT_DIM.getRed(), UI_TEXT_DIM.getGreen(), UI_TEXT_DIM.getBlue(), 160));
+                g.drawLine(textX + prefixW, strikeY, textX + prefixW + Math.max(0, nameW), strikeY);
+            }
+
+            cursorY += ROW_HEIGHT + 2;
+            usedHeight += ROW_HEIGHT + 2;
         }
     }
 
-    private void renderRulesTab(Graphics2D g, FontMetrics fm, int panelX, int cursorY, int panelHeight)
+    private void renderRulesTab(Graphics2D g, FontMetrics fm, int panelX, int cursorY)
     {
-        g.setColor(Color.WHITE);
+        g.setColor(UI_GOLD);
         g.drawString("House Rules", panelX + PANEL_PADDING, cursorY);
-        cursorY += ROW_HEIGHT + 8;
+        cursorY += ROW_HEIGHT + 10;
 
-        g.setColor(new Color(255, 255, 255, 170));
+        g.setColor(UI_TEXT_DIM);
         String line1 = "Placeholder: add your rules here later.";
-        String line2 = "You can hardcode for now or load from config.";
+        String line2 = "Tip: store rules in config or a text file.";
 
         g.drawString(truncateToWidth(line1, fm, PANEL_WIDTH - 2 * PANEL_PADDING), panelX + PANEL_PADDING, cursorY);
         cursorY += ROW_HEIGHT;
@@ -602,16 +635,16 @@ public class XtremeTaskerOverlay extends Overlay
     {
         if (tab == MainTab.CURRENT)
         {
-            return 220;
+            return 250;
         }
         if (tab == MainTab.RULES)
         {
-            return 220;
+            return 250;
         }
 
         int tasksCount = getTasksForTier(activeTierTab).size();
-        int base = 165; // includes sort toggle row
-        return base + (tasksCount * ROW_HEIGHT);
+        int base = 215; // header + tabs + tier tabs + sort + help
+        return base + (tasksCount * (ROW_HEIGHT + 2));
     }
 
     private List<XtremeTask> getTasksForTier(TaskTier tier)
@@ -673,40 +706,99 @@ public class XtremeTaskerOverlay extends Overlay
 
     private void drawTab(Graphics2D g, Rectangle bounds, String text, boolean active)
     {
-        g.setColor(active ? new Color(90, 90, 90, 220) : new Color(40, 40, 40, 200));
-        g.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8);
+        Color bg = active ? TAB_ACTIVE_BG : TAB_INACTIVE_BG;
+        drawBevelBox(g, bounds, bg, UI_EDGE_LIGHT, UI_EDGE_DARK);
 
-        g.setColor(new Color(255, 255, 255, active ? 230 : 140));
-        g.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8);
+        if (active)
+        {
+            g.setColor(UI_GOLD);
+            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        }
+
+        g.setColor(active ? UI_TEXT : UI_TEXT_DIM);
 
         FontMetrics fm = g.getFontMetrics();
         String drawText = truncateToWidth(text, fm, bounds.width - 8);
         int tw = fm.stringWidth(drawText);
-        int th = fm.getAscent();
 
         int tx = bounds.x + (bounds.width - tw) / 2;
-        int ty = bounds.y + (bounds.height + th) / 2 - 2;
+        int ty = centeredTextBaseline(bounds, fm);
+
+        g.drawString(drawText, tx, ty);
+    }
+
+    private void drawTierTab(Graphics2D g, Rectangle bounds, String text, boolean active)
+    {
+        Color bg = active ? new Color(78, 62, 38, 240) : new Color(32, 26, 17, 235);
+        drawBevelBox(g, bounds, bg, UI_EDGE_LIGHT, UI_EDGE_DARK);
+
+        if (active)
+        {
+            g.setColor(UI_GOLD);
+            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        }
+
+        g.setColor(active ? UI_TEXT : UI_TEXT_DIM);
+
+        FontMetrics fm = g.getFontMetrics();
+        String drawText = truncateToWidth(text, fm, bounds.width - 6);
+        int tw = fm.stringWidth(drawText);
+
+        int tx = bounds.x + (bounds.width - tw) / 2;
+        int ty = centeredTextBaseline(bounds, fm);
 
         g.drawString(drawText, tx, ty);
     }
 
     private void drawButton(Graphics2D g, Rectangle bounds, String text, boolean enabled)
     {
-        g.setColor(enabled ? new Color(60, 60, 60, 210) : new Color(30, 30, 30, 160));
-        g.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8);
+        Color bg = enabled ? BTN_ENABLED_BG : BTN_DISABLED_BG;
+        drawBevelBox(g, bounds, bg, UI_EDGE_LIGHT, UI_EDGE_DARK);
 
-        g.setColor(new Color(255, 255, 255, enabled ? 220 : 90));
-        g.drawRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8);
+        if (enabled)
+        {
+            g.setColor(UI_GOLD);
+            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        }
+
+        g.setColor(enabled ? UI_TEXT : new Color(UI_TEXT_DIM.getRed(), UI_TEXT_DIM.getGreen(), UI_TEXT_DIM.getBlue(), 130));
 
         FontMetrics fm = g.getFontMetrics();
         String drawText = truncateToWidth(text, fm, bounds.width - 10);
         int tw = fm.stringWidth(drawText);
-        int th = fm.getAscent();
 
         int tx = bounds.x + (bounds.width - tw) / 2;
-        int ty = bounds.y + (bounds.height + th) / 2 - 2;
+        int ty = centeredTextBaseline(bounds, fm);
 
         g.drawString(drawText, tx, ty);
+    }
+
+    /**
+     * True vertical centering: baseline computed from full font height, not just ascent.
+     */
+    private int centeredTextBaseline(Rectangle bounds, FontMetrics fm)
+    {
+        return bounds.y + ((bounds.height - fm.getHeight()) / 2) + fm.getAscent();
+    }
+
+    private void drawBevelBox(Graphics2D g, Rectangle r, Color fill, Color light, Color dark)
+    {
+        g.setColor(fill);
+        g.fillRect(r.x, r.y, r.width, r.height);
+
+        // Outer border
+        g.setColor(dark);
+        g.drawRect(r.x, r.y, r.width, r.height);
+
+        // Bevel: light top/left
+        g.setColor(light);
+        g.drawLine(r.x + 1, r.y + 1, r.x + r.width - 2, r.y + 1);
+        g.drawLine(r.x + 1, r.y + 1, r.x + 1, r.y + r.height - 2);
+
+        // Bevel: dark bottom/right
+        g.setColor(dark);
+        g.drawLine(r.x + 1, r.y + r.height - 2, r.x + r.width - 2, r.y + r.height - 2);
+        g.drawLine(r.x + r.width - 2, r.y + 1, r.x + r.width - 2, r.y + r.height - 2);
     }
 
     private String truncateToWidth(String text, FontMetrics fm, int maxWidth)
