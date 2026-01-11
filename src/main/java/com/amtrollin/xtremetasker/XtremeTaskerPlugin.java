@@ -4,12 +4,16 @@ import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -18,12 +22,10 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
+import com.amtrollin.xtremetasker.persistence.PersistedState;
+
 import javax.inject.Inject;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -34,29 +36,38 @@ import java.util.stream.Collectors;
 )
 public class XtremeTaskerPlugin extends Plugin
 {
-    @Inject
-    private Client client;
+    private static final String CONFIG_GROUP = "xtremetasker";
+    private static final String STATE_KEY_PREFIX = "state_"; // state_<accountKey>
 
-    @Inject
-    private XtremeTaskerConfig config;
+    // Only tiers you currently expose in the UI/progression
+    private static final List<TaskTier> PROGRESSION = List.of(
+            TaskTier.EASY,
+            TaskTier.MEDIUM,
+            TaskTier.HARD,
+            TaskTier.ELITE,
+            TaskTier.MASTER
+    );
 
-    @Inject
-    private OverlayManager overlayManager;
+    @Inject private Client client;
+    @Inject private XtremeTaskerConfig config;
+    @Inject private OverlayManager overlayManager;
+    @Inject private XtremeTaskerOverlay overlay;
+    @Inject private MouseManager mouseManager;
+    @Inject private ConfigManager configManager;
 
-    @Inject
-    private XtremeTaskerOverlay overlay;
-
-    @Inject
-    private MouseManager mouseManager;
+    private final Gson gson = new GsonBuilder().create();
+    private final Random random = new Random();
 
     private final Set<String> completedTaskIds = new HashSet<>();
 
-    private final java.util.EnumMap<TaskTier, Integer> totalByTier = new java.util.EnumMap<>(TaskTier.class);
-    private final java.util.EnumMap<TaskTier, Integer> doneByTier = new java.util.EnumMap<>(TaskTier.class);
+    // Cached tier counts (fast UI)
+    private final EnumMap<TaskTier, Integer> totalByTier = new EnumMap<>(TaskTier.class);
+    private final EnumMap<TaskTier, Integer> doneByTier = new EnumMap<>(TaskTier.class);
 
-    @Getter
-    @Setter
+    @Getter @Setter
     private XtremeTask currentTask;
+
+    private String activeAccountKey = null;
 
     // Dummy data for now
     private final List<XtremeTask> dummyTasks = List.of(
@@ -100,36 +111,52 @@ public class XtremeTaskerPlugin extends Plugin
             new XtremeTask("cl_elite_25", "Obtain a unique from the Wilderness bosses", TaskSource.COLLECTION_LOG, TaskTier.ELITE)
     );
 
-    private final Random random = new Random();
-
     @Override
-    protected void startUp() throws Exception
+    protected void startUp()
     {
-        log.info("Xtreme Tasker started (overlay-only, MVP)");
+        log.info("Xtreme Tasker started");
 
         updateOverlayState();
+
+        // init caches (even before loading, so overlay can render 0s safely)
         rebuildTierCounts();
 
-        // Register input listeners ONLY when overlay is enabled
         if (config.showOverlay())
         {
             mouseManager.registerMouseListener(overlay.getMouseAdapter());
             mouseManager.registerMouseWheelListener(overlay.getMouseWheelListener());
         }
+
+        // If user reloads plugin while already logged in, load state immediately.
+        String key = getAccountKey();
+        if (key != null)
+        {
+            activeAccountKey = key;
+            loadStateForAccount(activeAccountKey);
+        }
     }
 
     @Override
-    protected void shutDown() throws Exception
+    protected void shutDown()
     {
         log.info("Xtreme Tasker stopped");
 
+        if (activeAccountKey != null)
+        {
+            saveStateForAccount(activeAccountKey);
+        }
+
         overlayManager.remove(overlay);
 
-        // Unregister input listeners (safe even if already unregistered)
         mouseManager.unregisterMouseListener(overlay.getMouseAdapter());
         mouseManager.unregisterMouseWheelListener(overlay.getMouseWheelListener());
 
         currentTask = null;
+        completedTaskIds.clear();
+        activeAccountKey = null;
+
+        // Leave caches in a safe state
+        rebuildTierCounts();
     }
 
     // ===== Overlay / Config =====
@@ -146,41 +173,10 @@ public class XtremeTaskerPlugin extends Plugin
         }
     }
 
-    private void rebuildTierCounts()
-    {
-        totalByTier.clear();
-        doneByTier.clear();
-
-        // init all tiers to 0 so you never get nulls
-        for (TaskTier tier : TaskTier.values())
-        {
-            totalByTier.put(tier, 0);
-            doneByTier.put(tier, 0);
-        }
-
-        // totals
-        for (XtremeTask t : dummyTasks)
-        {
-            TaskTier tier = t.getTier();
-            totalByTier.put(tier, totalByTier.get(tier) + 1);
-        }
-
-        // done counts
-        for (XtremeTask t : dummyTasks)
-        {
-            if (isTaskCompleted(t))
-            {
-                TaskTier tier = t.getTier();
-                doneByTier.put(tier, doneByTier.get(tier) + 1);
-            }
-        }
-    }
-
-
     @Subscribe
     public void onConfigChanged(ConfigChanged event)
     {
-        if (!"xtremetasker".equals(event.getGroup()))
+        if (!CONFIG_GROUP.equals(event.getGroup()))
         {
             return;
         }
@@ -210,27 +206,6 @@ public class XtremeTaskerPlugin extends Plugin
         return dummyTasks;
     }
 
-    /**
-     * Current tier = lowest tier that still has any INCOMPLETE tasks.
-     */
-    public TaskTier getCurrentTier()
-    {
-        // Only consider tiers you currently support in the UI / progression
-        List<TaskTier> progression = List.of(TaskTier.EASY, TaskTier.MEDIUM, TaskTier.HARD, TaskTier.ELITE, TaskTier.MASTER);
-
-        for (TaskTier tier : progression)
-        {
-            boolean hasIncomplete = dummyTasks.stream()
-                    .anyMatch(t -> t.getTier() == tier && !isTaskCompleted(t));
-            if (hasIncomplete)
-            {
-                return tier;
-            }
-        }
-        return null;
-    }
-
-
     public boolean isTaskCompleted(XtremeTask task)
     {
         return completedTaskIds.contains(task.getId());
@@ -246,7 +221,150 @@ public class XtremeTaskerPlugin extends Plugin
         return config.showOverlay();
     }
 
-    // ===== Internal MVP logic =====
+    // ===== Account persistence =====
+
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged event)
+    {
+        GameState gs = event.getGameState();
+
+        if (gs == GameState.LOGGED_IN)
+        {
+            String key = getAccountKey();
+            if (key != null && !key.equals(activeAccountKey))
+            {
+                if (activeAccountKey != null)
+                {
+                    saveStateForAccount(activeAccountKey);
+                }
+
+                activeAccountKey = key;
+                loadStateForAccount(activeAccountKey);
+                log.info("Loaded XtremeTasker state for {}", activeAccountKey);
+            }
+        }
+
+        if (gs == GameState.LOGIN_SCREEN || gs == GameState.HOPPING)
+        {
+            if (activeAccountKey != null)
+            {
+                saveStateForAccount(activeAccountKey);
+                log.info("Saved XtremeTasker state for {}", activeAccountKey);
+            }
+        }
+    }
+
+    private String getAccountKey()
+    {
+        if (client.getGameState() != GameState.LOGGED_IN)
+        {
+            return null;
+        }
+
+        long hash = client.getAccountHash();
+        if (hash == -1L)
+        {
+            return null;
+        }
+
+        return Long.toUnsignedString(hash);
+    }
+
+
+    private String stateConfigKeyForAccount(String accountKey)
+    {
+        return STATE_KEY_PREFIX + accountKey;
+    }
+
+    private void saveStateForAccount(String accountKey)
+    {
+        if (accountKey == null)
+        {
+            return;
+        }
+
+        PersistedState state = new PersistedState();
+        state.setCompletedTaskIds(new HashSet<>(completedTaskIds));
+        state.setCurrentTaskId(currentTask != null ? currentTask.getId() : null);
+
+        String json = gson.toJson(state);
+        configManager.setConfiguration(CONFIG_GROUP, stateConfigKeyForAccount(accountKey), json);
+    }
+
+    private void loadStateForAccount(String accountKey)
+    {
+        completedTaskIds.clear();
+        currentTask = null;
+
+        if (accountKey == null)
+        {
+            rebuildTierCounts();
+            return;
+        }
+
+        String json = configManager.getConfiguration(CONFIG_GROUP, stateConfigKeyForAccount(accountKey));
+        if (json == null || json.trim().isEmpty())
+        {
+            rebuildTierCounts();
+            return;
+        }
+
+        try
+        {
+            PersistedState state = gson.fromJson(json, PersistedState.class);
+
+            if (state != null && state.getCompletedTaskIds() != null)
+            {
+                completedTaskIds.addAll(state.getCompletedTaskIds());
+            }
+
+            if (state != null && state.getCurrentTaskId() != null)
+            {
+                String id = state.getCurrentTaskId();
+                currentTask = dummyTasks.stream()
+                        .filter(t -> t.getId().equals(id))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+        catch (Exception e)
+        {
+            log.warn("Failed to parse persisted state for account {}. Resetting.", accountKey, e);
+            completedTaskIds.clear();
+            currentTask = null;
+        }
+
+        rebuildTierCounts();
+    }
+
+    // ===== Tier counts / progress =====
+
+    private void rebuildTierCounts()
+    {
+        totalByTier.clear();
+        doneByTier.clear();
+
+        for (TaskTier tier : TaskTier.values())
+        {
+            totalByTier.put(tier, 0);
+            doneByTier.put(tier, 0);
+        }
+
+        for (XtremeTask t : dummyTasks)
+        {
+            TaskTier tier = t.getTier();
+            totalByTier.put(tier, totalByTier.getOrDefault(tier, 0) + 1);
+        }
+
+        for (XtremeTask t : dummyTasks)
+        {
+            if (isTaskCompleted(t))
+            {
+                TaskTier tier = t.getTier();
+                doneByTier.put(tier, doneByTier.getOrDefault(tier, 0) + 1);
+            }
+        }
+    }
 
     public int getTierTotal(TaskTier tier)
     {
@@ -276,6 +394,24 @@ public class XtremeTaskerPlugin extends Plugin
         return done + "/" + total + " (" + pct + "%)";
     }
 
+    /**
+     * Current tier = first tier (by progression) that still has any incomplete tasks.
+     */
+    public TaskTier getCurrentTier()
+    {
+        for (TaskTier tier : PROGRESSION)
+        {
+            boolean hasIncomplete = dummyTasks.stream()
+                    .anyMatch(t -> t.getTier() == tier && !isTaskCompleted(t));
+            if (hasIncomplete)
+            {
+                return tier;
+            }
+        }
+        return null;
+    }
+
+    // ===== Core actions (with persistence) =====
 
     /**
      * Roll a random task from the current tier, excluding completed tasks.
@@ -285,7 +421,7 @@ public class XtremeTaskerPlugin extends Plugin
         TaskTier currentTier = getCurrentTier();
         if (currentTier == null)
         {
-            return null; // everything completed
+            return null;
         }
 
         List<XtremeTask> available = dummyTasks.stream()
@@ -301,10 +437,41 @@ public class XtremeTaskerPlugin extends Plugin
         return available.get(random.nextInt(available.size()));
     }
 
-    /**
-     * Toggle completion: completed <-> incomplete.
-     */
-    public void toggleTaskCompleted(XtremeTask task)
+    public void rollRandomTaskAndPersist()
+    {
+        XtremeTask cur = getCurrentTask();
+        if (cur != null && !isTaskCompleted(cur))
+        {
+            return; // must complete current before rolling
+        }
+
+        XtremeTask newTask = rollRandomTask();
+        setCurrentTask(newTask);
+        persistIfPossible();
+    }
+
+    public void completeCurrentTaskAndPersist()
+    {
+        XtremeTask cur = getCurrentTask();
+        if (cur == null)
+        {
+            return;
+        }
+        if (!isTaskCompleted(cur))
+        {
+            toggleTaskCompletedInternal(cur);
+        }
+        persistIfPossible();
+    }
+
+    public void toggleTaskCompletedAndPersist(XtremeTask task)
+    {
+        toggleTaskCompletedInternal(task);
+        persistIfPossible();
+    }
+
+    // Internal toggle (updates caches)
+    private void toggleTaskCompletedInternal(XtremeTask task)
     {
         String id = task.getId();
         TaskTier tier = task.getTier();
@@ -323,14 +490,21 @@ public class XtremeTaskerPlugin extends Plugin
         }
     }
 
+    private void persistIfPossible()
+    {
+        if (activeAccountKey != null)
+        {
+            saveStateForAccount(activeAccountKey);
+        }
+    }
 
-    // ===== Optional: keep these if you still use them elsewhere (safe to keep) =====
+    // ===== Optional chat helpers (kept) =====
 
     public void handleOverlayLeftClick()
     {
-        XtremeTask newTask = rollRandomTask();
-        currentTask = newTask;
+        rollRandomTaskAndPersist();
 
+        XtremeTask newTask = currentTask;
         if (newTask == null)
         {
             client.addChatMessage(
@@ -363,7 +537,7 @@ public class XtremeTaskerPlugin extends Plugin
             return;
         }
 
-        toggleTaskCompleted(currentTask);
+        completeCurrentTaskAndPersist();
 
         boolean nowCompleted = isTaskCompleted(currentTask);
         String status = nowCompleted ? "completed" : "set to incomplete";
