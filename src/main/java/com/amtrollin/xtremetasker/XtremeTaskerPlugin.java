@@ -3,27 +3,32 @@ package com.amtrollin.xtremetasker;
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
+import com.amtrollin.xtremetasker.persistence.PersistedState;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.inject.Provides;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
+import net.runelite.api.GameState;
+import net.runelite.api.events.GameStateChanged;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Random;
-import java.util.Set;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -32,241 +37,514 @@ import java.util.stream.Collectors;
         description = "Progressive random task generator using Combat Achievements and collection log entries, with completion tracking.",
         tags = {"tasks", "combat achievements", "collection log"}
 )
-public class XtremeTaskerPlugin extends Plugin
-{
+public class XtremeTaskerPlugin extends Plugin {
+    private static final String CONFIG_GROUP = "xtremetasker";
+    private static final String STATE_KEY_PREFIX = "state_";
+
+    private static final List<TaskTier> PROGRESSION = List.of(
+            TaskTier.EASY,
+            TaskTier.MEDIUM,
+            TaskTier.HARD,
+            TaskTier.ELITE,
+            TaskTier.MASTER
+    );
+
     @Inject
     private Client client;
-
     @Inject
     private XtremeTaskerConfig config;
-
     @Inject
     private OverlayManager overlayManager;
-
     @Inject
     private XtremeTaskerOverlay overlay;
-
     @Inject
     private MouseManager mouseManager;
+    @Inject
+    private ConfigManager configManager;
+    @Inject
+    private ClientThread clientThread;
+    @Inject
+    private KeyManager keyManager;
 
-    private final Set<String> completedTaskIds = new HashSet<>();
+    private final Gson gson = new GsonBuilder().create();
+    private final Random random = new Random();
+
+    private final Set<String> manualCompletedTaskIds = new HashSet<>();
+    private final Set<String> syncedCompletedTaskIds = new HashSet<>();
+
+    private final EnumMap<TaskTier, Integer> totalByTier = new EnumMap<>(TaskTier.class);
+    private final EnumMap<TaskTier, Integer> doneByTier = new EnumMap<>(TaskTier.class);
 
     @Getter
     @Setter
     private XtremeTask currentTask;
 
-    // Dummy data for now
-    private final List<XtremeTask> dummyTasks = List.of(
-            new XtremeTask("ca_easy_1", "Kill 10 goblins", TaskSource.COMBAT_ACHIEVEMENT, TaskTier.EASY),
-            new XtremeTask("ca_easy_2", "Complete a beginner clue", TaskSource.COMBAT_ACHIEVEMENT, TaskTier.EASY),
-            new XtremeTask("ca_easy_3", "Complete a random clue", TaskSource.COMBAT_ACHIEVEMENT, TaskTier.EASY),
-            new XtremeTask("ca_easy_4", "Complete a fun clue", TaskSource.COMBAT_ACHIEVEMENT, TaskTier.EASY),
-            new XtremeTask("cl_med_1", "Steal any Witch item", TaskSource.COLLECTION_LOG, TaskTier.MEDIUM),
-            new XtremeTask("cl_med_2", "Obtain any Barrows item", TaskSource.COLLECTION_LOG, TaskTier.MEDIUM),
-            new XtremeTask("cl_hard_1", "Obtain a unique from Chambers of Xeric", TaskSource.COLLECTION_LOG, TaskTier.HARD),
-            new XtremeTask("cl_hard_2", "Obtain a unique from Castle of Dacoda", TaskSource.COLLECTION_LOG, TaskTier.HARD),
-            new XtremeTask("cl_hard_3", "Obtain a unique from Cabin of Rocco", TaskSource.COLLECTION_LOG, TaskTier.HARD)
-    );
+    private String pendingCurrentTaskId = null;
+    private String activeAccountKey = null;
 
-    private final Random random = new Random();
+    private final List<XtremeTask> tasks = new ArrayList<>();
+    private boolean taskPackLoaded = false;
 
     @Override
-    protected void startUp() throws Exception
-    {
-        log.info("Xtreme Tasker started (overlay-only, MVP)");
+    protected void startUp() {
+        log.info("Xtreme Tasker started");
 
         updateOverlayState();
+        rebuildTierCounts();
 
-        // Only register mouse listener if overlay is enabled
-        if (config.showOverlay())
-        {
+        if (config.showOverlay()) {
+            keyManager.registerKeyListener(overlay.getKeyListener());
             mouseManager.registerMouseListener(overlay.getMouseAdapter());
+            mouseManager.registerMouseWheelListener(overlay.getMouseWheelListener());
         }
+
+        String key = getAccountKey();
+        if (key != null) {
+            activeAccountKey = key;
+            loadStateForAccount(activeAccountKey);
+        }
+
+        clientThread.invokeLater(this::reloadTaskPackInternal);
     }
 
     @Override
-    protected void shutDown() throws Exception
-    {
+    protected void shutDown() {
         log.info("Xtreme Tasker stopped");
 
+        if (activeAccountKey != null) {
+            saveStateForAccount(activeAccountKey);
+        }
+
         overlayManager.remove(overlay);
+        keyManager.unregisterKeyListener(overlay.getKeyListener());
         mouseManager.unregisterMouseListener(overlay.getMouseAdapter());
+        mouseManager.unregisterMouseWheelListener(overlay.getMouseWheelListener());
 
         currentTask = null;
+        pendingCurrentTaskId = null;
+
+        manualCompletedTaskIds.clear();
+        syncedCompletedTaskIds.clear();
+
+        activeAccountKey = null;
+
+        tasks.clear();
+        taskPackLoaded = false;
+
+        rebuildTierCounts();
     }
 
-    // ===== Overlay / Config =====
-
-    private void updateOverlayState()
-    {
-        if (config.showOverlay())
-        {
+    private void updateOverlayState() {
+        if (config.showOverlay()) {
             overlayManager.add(overlay);
-        }
-        else
-        {
+        } else {
             overlayManager.remove(overlay);
         }
     }
 
     @Subscribe
-    public void onConfigChanged(ConfigChanged event)
-    {
-        if (!"xtremetasker".equals(event.getGroup()))
-        {
+    public void onConfigChanged(ConfigChanged event) {
+        if (!CONFIG_GROUP.equals(event.getGroup())) {
             return;
         }
 
         updateOverlayState();
 
-        if (!config.showOverlay())
-        {
+        if (!config.showOverlay()) {
+            keyManager.unregisterKeyListener(overlay.getKeyListener());
             mouseManager.unregisterMouseListener(overlay.getMouseAdapter());
-        }
-        else
-        {
+            mouseManager.unregisterMouseWheelListener(overlay.getMouseWheelListener());
+        } else {
+            keyManager.registerKeyListener(overlay.getKeyListener());
             mouseManager.registerMouseListener(overlay.getMouseAdapter());
+            mouseManager.registerMouseWheelListener(overlay.getMouseWheelListener());
         }
     }
 
     @Provides
-    XtremeTaskerConfig provideConfig(ConfigManager configManager)
-    {
+    XtremeTaskerConfig provideConfig(ConfigManager configManager) {
         return configManager.getConfig(XtremeTaskerConfig.class);
     }
 
-    public List<XtremeTask> getDummyTasks()
-    {
-        return dummyTasks;
+    // overlay still calls getDummyTasks()
+    public List<XtremeTask> getDummyTasks() {
+        return tasks;
     }
 
-    /**
-     * Current tier = lowest tier that still has any INCOMPLETE tasks.
-     */
-    public TaskTier getCurrentTier()
-    {
-        return dummyTasks.stream()
-                .filter(t -> !isTaskCompleted(t))
-                .map(XtremeTask::getTier)
-                .min(Comparator.comparingInt(TaskTier::ordinal))
-                .orElse(null);
+    public boolean hasTaskPackLoaded() {
+        return taskPackLoaded && !tasks.isEmpty();
     }
 
-    public boolean isTaskCompleted(XtremeTask task)
-    {
-        return completedTaskIds.contains(task.getId());
+    public boolean isTaskCompleted(XtremeTask task) {
+        String id = task.getId();
+        return manualCompletedTaskIds.contains(id) || syncedCompletedTaskIds.contains(id);
     }
 
-    public boolean isShowCompletedEnabled()
-    {
-        return config.showCompleted();
-    }
-
-    public boolean isOverlayEnabled()
-    {
+    public boolean isOverlayEnabled() {
         return config.showOverlay();
     }
 
-    // ===== MVP overlay actions =====
+    // ---------- account persistence ----------
 
-    /**
-     * Left-click behavior: roll a task (from current tier only).
-     */
-    public void handleOverlayLeftClick()
-    {
-        XtremeTask newTask = rollRandomTask();
-        currentTask = newTask;
+    @Subscribe
+    public void onGameStateChanged(GameStateChanged event) {
+        GameState gs = event.getGameState();
 
-        if (newTask == null)
-        {
-            client.addChatMessage(
-                    ChatMessageType.GAMEMESSAGE,
-                    "",
-                    "Xtreme Tasker: no available tasks in the current tier.",
-                    null
-            );
+        if (gs == GameState.LOGGED_IN) {
+            String key = getAccountKey();
+            if (key != null && !key.equals(activeAccountKey)) {
+                if (activeAccountKey != null) {
+                    saveStateForAccount(activeAccountKey);
+                }
+
+                activeAccountKey = key;
+                loadStateForAccount(activeAccountKey);
+                log.info("Loaded XtremeTasker state for {}", activeAccountKey);
+            }
+        }
+
+        if (gs == GameState.LOGIN_SCREEN || gs == GameState.HOPPING) {
+            if (activeAccountKey != null) {
+                saveStateForAccount(activeAccountKey);
+                log.info("Saved XtremeTasker state for {}", activeAccountKey);
+            }
+        }
+    }
+
+    private String getAccountKey() {
+        if (client.getGameState() != GameState.LOGGED_IN) {
+            return null;
+        }
+
+        long hash = client.getAccountHash();
+        if (hash == -1L) {
+            return null;
+        }
+
+        return Long.toUnsignedString(hash);
+    }
+
+    private String stateConfigKeyForAccount(String accountKey) {
+        return STATE_KEY_PREFIX + accountKey;
+    }
+
+    private void saveStateForAccount(String accountKey) {
+        if (accountKey == null) {
             return;
         }
 
-        client.addChatMessage(
-                ChatMessageType.GAMEMESSAGE,
-                "",
-                "Xtreme Tasker task: [" + newTask.getTier().name() + "] " + newTask.getName(),
-                null
-        );
+        PersistedState state = new PersistedState();
+        state.setManualCompletedTaskIds(new HashSet<>(manualCompletedTaskIds));
+        state.setSyncedCompletedTaskIds(new HashSet<>(syncedCompletedTaskIds));
+
+        String curId = (currentTask != null) ? currentTask.getId() : pendingCurrentTaskId;
+        state.setCurrentTaskId(curId);
+
+        String key = stateConfigKeyForAccount(accountKey);
+        configManager.setConfiguration(CONFIG_GROUP, key, gson.toJson(state));
     }
 
-    /**
-     * Right-click behavior: toggle completion for current task.
-     */
-    public void handleOverlayRightClick()
-    {
-        if (currentTask == null)
-        {
-            client.addChatMessage(
-                    ChatMessageType.GAMEMESSAGE,
-                    "",
-                    "Xtreme Tasker: no current task to mark complete.",
-                    null
-            );
+    private void loadStateForAccount(String accountKey) {
+        manualCompletedTaskIds.clear();
+        syncedCompletedTaskIds.clear();
+        currentTask = null;
+        pendingCurrentTaskId = null;
+
+        if (accountKey == null) {
+            rebuildTierCounts();
             return;
         }
 
-        toggleTaskCompleted(currentTask);
+        String json = configManager.getConfiguration(CONFIG_GROUP, stateConfigKeyForAccount(accountKey));
+        if (json == null || json.trim().isEmpty()) {
+            rebuildTierCounts();
+            return;
+        }
 
-        boolean nowCompleted = isTaskCompleted(currentTask);
-        String status = nowCompleted ? "completed" : "set to incomplete";
+        try {
+            PersistedState state = gson.fromJson(json, PersistedState.class);
+            if (state != null) {
+                if (state.getManualCompletedTaskIds() != null)
+                    manualCompletedTaskIds.addAll(state.getManualCompletedTaskIds());
+                if (state.getSyncedCompletedTaskIds() != null)
+                    syncedCompletedTaskIds.addAll(state.getSyncedCompletedTaskIds());
+                pendingCurrentTaskId = state.getCurrentTaskId();
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse persisted state for account {}. Resetting.", accountKey, e);
+            manualCompletedTaskIds.clear();
+            syncedCompletedTaskIds.clear();
+            currentTask = null;
+            pendingCurrentTaskId = null;
+        }
 
-        client.addChatMessage(
-                ChatMessageType.GAMEMESSAGE,
-                "",
-                "Xtreme Tasker: " + currentTask.getName() + " " + status + ".",
-                null
-        );
+        resolveCurrentTaskIfPossible();
+        rebuildTierCounts();
     }
 
-    // ===== Internal MVP logic =====
+    private void resolveCurrentTaskIfPossible() {
+        if (pendingCurrentTaskId == null || tasks.isEmpty()) {
+            return;
+        }
 
-    /**
-     * Roll a random task from the current tier, excluding completed tasks.
-     */
-    public XtremeTask rollRandomTask()
-    {
+        String id = pendingCurrentTaskId;
+        currentTask = tasks.stream().filter(t -> id.equals(t.getId())).findFirst().orElse(null);
+
+        if (currentTask != null) {
+            pendingCurrentTaskId = null;
+        }
+    }
+
+    // ---------- tier counts / progress ----------
+
+    private void rebuildTierCounts() {
+        totalByTier.clear();
+        doneByTier.clear();
+
+        for (TaskTier tier : TaskTier.values()) {
+            totalByTier.put(tier, 0);
+            doneByTier.put(tier, 0);
+        }
+
+        for (XtremeTask t : tasks) {
+            TaskTier tier = t.getTier();
+            totalByTier.put(tier, totalByTier.getOrDefault(tier, 0) + 1);
+        }
+
+        for (XtremeTask t : tasks) {
+            if (isTaskCompleted(t)) {
+                TaskTier tier = t.getTier();
+                doneByTier.put(tier, doneByTier.getOrDefault(tier, 0) + 1);
+            }
+        }
+    }
+
+    public int getTierTotal(TaskTier tier) {
+        return totalByTier.getOrDefault(tier, 0);
+    }
+
+    public int getTierDone(TaskTier tier) {
+        return doneByTier.getOrDefault(tier, 0);
+    }
+
+    public int getTierPercent(TaskTier tier) {
+        int total = getTierTotal(tier);
+        if (total <= 0) return 0;
+        return (int) Math.round((getTierDone(tier) * 100.0) / total);
+    }
+
+    public String getTierProgressLabel(TaskTier tier) {
+        int total = getTierTotal(tier);
+        int done = getTierDone(tier);
+        int pct = (total <= 0) ? 0 : (int) Math.round((done * 100.0) / total);
+        return done + "/" + total + " (" + pct + "%)";
+    }
+
+    public TaskTier getCurrentTier() {
+        for (TaskTier tier : PROGRESSION) {
+            boolean hasIncomplete = tasks.stream().anyMatch(t -> t.getTier() == tier && !isTaskCompleted(t));
+            if (hasIncomplete) return tier;
+        }
+        return null;
+    }
+
+    // ---------- core actions ----------
+
+    public XtremeTask rollRandomTask() {
         TaskTier currentTier = getCurrentTier();
-        if (currentTier == null)
-        {
-            return null; // everything completed
-        }
+        if (currentTier == null) return null;
 
-        List<XtremeTask> available = dummyTasks.stream()
+        List<XtremeTask> available = tasks.stream()
                 .filter(t -> t.getTier() == currentTier)
                 .filter(t -> !isTaskCompleted(t))
                 .collect(Collectors.toList());
 
-        if (available.isEmpty())
-        {
-            return null;
-        }
-
+        if (available.isEmpty()) return null;
         return available.get(random.nextInt(available.size()));
     }
 
-    /**
-     * Toggle completion: completed <-> incomplete.
-     */
-    public void toggleTaskCompleted(XtremeTask task)
-    {
+    public void rollRandomTaskAndPersist() {
+        if (!hasTaskPackLoaded()) {
+            chat("Xtreme Tasker: No tasks loaded. Load tasks in Rules tab");
+            return;
+        }
+
+        XtremeTask cur = getCurrentTask();
+        if (cur != null && !isTaskCompleted(cur)) {
+            return;
+        }
+
+        XtremeTask newTask = rollRandomTask();
+        setCurrentTask(newTask);
+
+        pendingCurrentTaskId = (newTask != null) ? newTask.getId() : null;
+        persistIfPossible();
+    }
+
+    public void completeCurrentTaskAndPersist() {
+        XtremeTask cur = getCurrentTask();
+        if (cur == null) return;
+
+        manualCompletedTaskIds.add(cur.getId());
+
+        rebuildTierCounts();
+        persistIfPossible();
+    }
+
+    public void toggleTaskCompletedAndPersist(XtremeTask task) {
         String id = task.getId();
 
-        if (completedTaskIds.contains(id))
-        {
-            completedTaskIds.remove(id);
-            log.info("Un-completed task: {} ({})", task.getName(), id);
+        if (id == null || id.trim().isEmpty()) {
+            log.warn("Refusing to toggle completion for task with null/blank id: {}", task.getName());
+            return;
         }
-        else
-        {
-            completedTaskIds.add(id);
-            log.info("Completed task: {} ({})", task.getName(), id);
+
+        if (manualCompletedTaskIds.contains(id)) manualCompletedTaskIds.remove(id);
+        else manualCompletedTaskIds.add(id);
+
+        rebuildTierCounts();
+        persistIfPossible();
+    }
+
+    private void persistIfPossible() {
+        if (activeAccountKey != null) {
+            saveStateForAccount(activeAccountKey);
         }
+    }
+
+    // ---------- JSON task pack loading ----------
+
+    public void reloadTaskPack() {
+        clientThread.invokeLater(this::reloadTaskPackInternal);
+    }
+
+    private void reloadTaskPackInternal() {
+        try {
+            InputStream in = XtremeTaskerPlugin.class
+                    .getClassLoader()
+                    .getResourceAsStream("task_data/tasks.json");
+
+            if (in == null) {
+                throw new IllegalStateException("tasks.json resource not found");
+            }
+
+            String json;
+            try (in) {
+                json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            }
+
+            TaskPack pack = gson.fromJson(json, TaskPack.class);
+
+            if (pack == null || pack.tasks == null) {
+                throw new IllegalArgumentException("Invalid tasks.json");
+            }
+
+            List<XtremeTask> loaded = new ArrayList<>();
+            Set<String> seenIds = new HashSet<>();
+
+            for (TaskDef d : pack.tasks) {
+                if (d == null) continue;
+
+                TaskTier tier = (d.tier == TaskTier.GRANDMASTER) ? TaskTier.MASTER : d.tier;
+
+                String id = ensureId(d.id, d.name, d.source, tier);
+
+                XtremeTask task = new XtremeTask(
+                        id,
+                        safeTrim(d.name),
+                        d.source,
+                        tier,
+                        d.iconItemId,
+                        safeTrim(d.iconKey),
+                        safeTrim(d.description),
+                        safeTrim(d.prereqs),
+                        safeTrim(d.wikiUrl)
+                );
+
+                if (!seenIds.add(task.getId())) {
+                    // IMPORTANT: Do NOT rename duplicates; it breaks persisted completion mapping when pack order changes.
+                    log.warn("Duplicate task id in tasks.json: {} (name={}). Skipping duplicate.", task.getId(), task.getName());
+                    continue;
+                }
+
+                loaded.add(task);
+            }
+
+            tasks.clear();
+            tasks.addAll(loaded);
+            taskPackLoaded = !tasks.isEmpty();
+
+            Set<String> validIds = tasks.stream()
+                    .map(XtremeTask::getId)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toSet());
+
+            manualCompletedTaskIds.retainAll(validIds);
+            syncedCompletedTaskIds.retainAll(validIds);
+
+            if (currentTask != null && !validIds.contains(currentTask.getId())) {
+                currentTask = null;
+            }
+
+            resolveCurrentTaskIfPossible();
+
+            rebuildTierCounts();
+            persistIfPossible();
+
+            chat("Xtreme Tasker: Loaded " + tasks.size() + " tasks.");
+        } catch (Exception e) {
+            log.error("Failed to load embedded tasks.json", e);
+            tasks.clear();
+            taskPackLoaded = false;
+            rebuildTierCounts();
+            chat("Xtreme Tasker: Failed to load tasks.json (see logs).");
+        }
+    }
+
+    private static class TaskPack {
+        int version;
+        List<TaskDef> tasks;
+    }
+
+    private static class TaskDef {
+        String id;
+        String name;
+        TaskSource source;
+        TaskTier tier;
+
+        Integer iconItemId;
+        String iconKey;
+
+        String description;
+        String prereqs;
+        String wikiUrl;
+    }
+
+    private void chat(String msg) {
+        clientThread.invokeLater(() ->
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null)
+        );
+    }
+
+    private static String safeTrim(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String ensureId(String rawId, String name, TaskSource source, TaskTier tier) {
+        String id = safeTrim(rawId);
+        if (id != null) {
+            return id;
+        }
+
+        String n = safeTrim(name);
+        if (n == null) n = "unnamed";
+
+        String s = (source == null) ? "UNKNOWN_SOURCE" : source.name();
+        String t = (tier == null) ? "UNKNOWN_TIER" : tier.name();
+
+        String base = (n + "|" + s + "|" + t).toLowerCase(Locale.ROOT);
+        return "gen_" + Integer.toHexString(base.hashCode());
     }
 }

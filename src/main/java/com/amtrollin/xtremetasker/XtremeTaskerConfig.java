@@ -5,25 +5,14 @@ import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
 
 @ConfigGroup("xtremetasker")
-public interface XtremeTaskerConfig extends Config
-{
-    @ConfigItem(
-            keyName = "showCompleted",
-            name = "Show Completed",
-            description = "Show tasks you have already completed in the list."
-    )
-    default boolean showCompleted()
-    {
-        return true;
-    }
-
+public interface XtremeTaskerConfig extends Config {
     @ConfigItem(
             keyName = "showOverlay",
             name = "Show overlay",
-            description = "Display the Xtreme Tasker overlay in-game"
+            description = "Show the Xtreme Tasker overlay"
     )
-    default boolean showOverlay()
-    {
+    default boolean showOverlay() {
         return true;
     }
+
 }
