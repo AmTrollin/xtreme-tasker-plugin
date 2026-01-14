@@ -78,7 +78,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
     // Animation timings
     private static final long COMPLETE_ANIM_MS = 220;
-    private static final long ROLL_ANIM_MS = 650;
+    private static final long ROLL_ANIM_MS = 1800;
 
     // Wiki button/icon
     private static final int WIKI_ICON_SIZE = 38;
@@ -671,12 +671,21 @@ public class XtremeTaskerOverlay extends Overlay {
 
             String prereqs = current.getPrereqs();
             g.setColor(UI_TEXT_DIM);
+
             if (prereqs != null && !prereqs.trim().isEmpty()) {
-                cursorY = drawWrapped(g, fm, prereqs, x, cursorY, maxW, 6);
+                // Convert "a; b; c" -> "a\nb\nc" (no trailing ;)
+                String formatted = prereqs
+                        .replace("\r", "")
+                        .replaceAll("\\s*;\\s*", "\n")   // split on semicolons with optional spaces
+                        .replaceAll("\n{2,}", "\n")      // collapse accidental double newlines
+                        .trim();
+
+                cursorY = drawWrapped(g, fm, formatted, x, cursorY, maxW, 6);
             } else {
                 g.drawString("None", x, cursorY);
                 cursorY += ROW_HEIGHT;
             }
+
             cursorY += 10;
 
             String wikiUrl = current.getWikiUrl();
@@ -996,8 +1005,25 @@ public class XtremeTaskerOverlay extends Overlay {
         }
 
         long now = System.currentTimeMillis();
-        int idx = (int) ((now / 60) % pool.size());
+        long elapsed = now - rollAnimStartMs;
+
+        // progress 0 → 1
+        float t = Math.min(1f, (float) elapsed / (float) ROLL_ANIM_MS);
+
+        // ease-out cubic (fast → slow)
+        float eased = 1f - (float) Math.pow(1f - t, 3);
+
+        // total spins (tweakable)
+        int spins = pool.size() * 2;
+
+        // choose index
+        int idx = Math.min(
+                pool.size() - 1,
+                (int) (eased * spins) % pool.size()
+        );
+
         String name = pool.get(idx).getName();
+
         if (name == null || name.trim().isEmpty()) {
             name = "Rolling...";
         }

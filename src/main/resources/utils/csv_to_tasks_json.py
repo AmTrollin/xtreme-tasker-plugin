@@ -41,10 +41,11 @@ def normalize_tier(tier: str) -> str:
     return "MASTER" if t == "GRANDMASTER" else t
 
 
-def stable_id(source: str, tier: str, name: str) -> str:
-    base = f"{source}|{tier}|{name}".strip().lower()
+def stable_row_id(source: str, tier: str, name: str, occurrence: int) -> str:
+    base = f"{source}|{tier}|{name}|{occurrence}".strip().lower()
     short = hashlib.sha1(base.encode("utf-8")).hexdigest()[:10]
-    return f"{source.lower()}_{tier.lower()}_{slug(name)[:40]}_{short}"
+    return f"{source.lower()}_{tier.lower()}_{slug(name)[:40]}_{occurrence:03d}_{short}"
+
 
 
 def http_get_json(url: str, timeout_s: int = 25) -> dict:
@@ -378,14 +379,23 @@ def pass1_build_from_csv(csv_path: Path, out_json: Path, enrich_wiki: bool) -> N
         h = header_map.get(key)
         return (row.get(h) if h else None)
 
+    occurrences: Dict[str, int] = {}
+
     for i, row in enumerate(reader, start=2):
         source = ((get(row, "source") or "")).strip().upper()
         tier_raw = ((get(row, "tier") or "")).strip().upper()
         name = ((get(row, "name") or "")).strip()
 
+        # ✅ pull these from CSV (husband file already has them)
+        prereqs = ((get(row, "prereqs") or "")).strip()
+        wiki_title_csv = ((get(row, "wikititle") or "")).strip()
+        wiki_url_csv = ((get(row, "wikiurl") or "")).strip()
+        desc_csv = ((get(row, "description") or "")).strip()
+
         icon_item_id_raw = ((get(row, "iconitemid") or "")).strip()
         icon_key = ((get(row, "iconkey") or "")).strip() or None
 
+        # skip blank rows
         if not source and not tier_raw and not name and not icon_item_id_raw and not icon_key:
             continue
 
@@ -402,7 +412,12 @@ def pass1_build_from_csv(csv_path: Path, out_json: Path, enrich_wiki: bool) -> N
             continue
 
         tier = normalize_tier(tier_raw)
-        tid = stable_id(source, tier, name)
+
+        # ✅ unique-per-occurrence id (allows intentional duplicates)
+        key = f"{source}|{tier}|{name}".strip().lower()
+        occurrences[key] = occurrences.get(key, 0) + 1
+        occ = occurrences[key]
+        tid = stable_row_id(source, tier, name, occ)
 
         task = {
             "id": tid,
@@ -421,26 +436,38 @@ def pass1_build_from_csv(csv_path: Path, out_json: Path, enrich_wiki: bool) -> N
         if icon_key:
             task["iconKey"] = icon_key
 
+        # ✅ ALWAYS keep prereqs from CSV
+        task["prereqs"] = prereqs if prereqs else "None"
+
+        # ✅ Always copy wiki fields from CSV if present
+        if wiki_title_csv:
+            task["wikiTitle"] = wiki_title_csv
+        if wiki_url_csv:
+            task["wikiUrl"] = wiki_url_csv
+        if desc_csv:
+            task["description"] = desc_csv
+
+        # ✅ Optionally fill missing wiki fields via wiki calls
         if enrich_wiki:
-            primary_title: Optional[str] = None
-
-            if source == "COMBAT_ACHIEVEMENT":
-                primary_title = wiki_search_best_title(name, srnamespace=0)
-            else:
-                primary_title = wiki_item_title_for_collection_log(name)
-
-            if primary_title:
-                task["wikiTitle"] = primary_title
-                task["wikiUrl"] = wiki_title_to_url(primary_title)
-
-                # Only CA gets description
+            # Only do lookups if fields are missing
+            if not task.get("wikiTitle"):
+                primary_title: Optional[str] = None
                 if source == "COMBAT_ACHIEVEMENT":
-                    desc = wiki_fetch_extract(primary_title, chars=520)
-                    if desc:
-                        task["description"] = desc
+                    primary_title = wiki_search_best_title(name, srnamespace=0)
+                else:
+                    primary_title = wiki_item_title_for_collection_log(name)
 
-        # Pass 1 ALWAYS sets prereqs to None (fast)
-        task["prereqs"] = "None"
+                if primary_title:
+                    task["wikiTitle"] = primary_title
+
+            if task.get("wikiTitle") and not task.get("wikiUrl"):
+                task["wikiUrl"] = wiki_title_to_url(task["wikiTitle"])
+
+            # Only CA gets description (your original behavior)
+            if source == "COMBAT_ACHIEVEMENT" and task.get("wikiTitle") and not task.get("description"):
+                desc = wiki_fetch_extract(task["wikiTitle"], chars=520)
+                if desc:
+                    task["description"] = desc
 
         tasks.append(task)
 
@@ -456,6 +483,7 @@ def pass1_build_from_csv(csv_path: Path, out_json: Path, enrich_wiki: bool) -> N
     out = {"version": 1, "tasks": tasks}
     out_json.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"Pass1 wrote {len(tasks)} tasks to {out_json}")
+
 
 
 # -------------------- Pass 2: Fill prereqs in existing JSON --------------------
