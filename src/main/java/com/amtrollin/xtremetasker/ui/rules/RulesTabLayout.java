@@ -1,0 +1,10 @@
+package com.amtrollin.xtremetasker.ui.rules;
+
+import java.awt.Rectangle;
+
+public final class RulesTabLayout
+{
+    public final Rectangle viewportBounds = new Rectangle();
+    public final Rectangle reloadButtonBounds = new Rectangle();
+    public int totalContentRows = 0;
+}

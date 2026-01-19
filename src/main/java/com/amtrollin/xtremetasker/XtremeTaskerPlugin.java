@@ -3,7 +3,7 @@ package com.amtrollin.xtremetasker;
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
-import com.amtrollin.xtremetasker.persistence.PersistedState;
+import com.amtrollin.xtremetasker.models.persistence.PersistedState;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -365,7 +365,7 @@ public class XtremeTaskerPlugin extends Plugin {
 
     public void rollRandomTaskAndPersist() {
         if (!hasTaskPackLoaded()) {
-            chat("Xtreme Tasker: No tasks loaded. Load tasks in Rules tab");
+            chat("No tasks loaded. Load tasks in Rules tab");
             return;
         }
 
@@ -491,13 +491,13 @@ public class XtremeTaskerPlugin extends Plugin {
             rebuildTierCounts();
             persistIfPossible();
 
-            chat("Xtreme Tasker: Loaded " + tasks.size() + " tasks.");
+            chat("Loaded " + tasks.size() + " tasks.");
         } catch (Exception e) {
             log.error("Failed to load embedded tasks.json", e);
             tasks.clear();
             taskPackLoaded = false;
             rebuildTierCounts();
-            chat("Xtreme Tasker: Failed to load tasks.json (see logs).");
+            chat("Failed to load tasks.json (see logs).");
         }
     }
 
@@ -522,7 +522,7 @@ public class XtremeTaskerPlugin extends Plugin {
 
     private void chat(String msg) {
         clientThread.invokeLater(() ->
-                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null)
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "Xtreme Tasker", msg, null)
         );
     }
 
