@@ -79,11 +79,16 @@ public class XtremeTaskerPlugin extends Plugin {
     @Setter
     private XtremeTask currentTask;
 
-    private String pendingCurrentTaskId = null;
     private String activeAccountKey = null;
+    private String currentTaskId = null;
 
     private final List<XtremeTask> tasks = new ArrayList<>();
     private boolean taskPackLoaded = false;
+
+    private boolean dirty = false;
+    private int flushTickCounter = 0;
+    private static final int FLUSH_EVERY_TICKS = 10; // ~6s (game tick ~0.6s)
+
 
     @Override
     protected void startUp() {
@@ -98,11 +103,17 @@ public class XtremeTaskerPlugin extends Plugin {
             mouseManager.registerMouseWheelListener(overlay.getMouseWheelListener());
         }
 
-        String key = getAccountKey();
-        if (key != null) {
-            activeAccountKey = key;
-            loadStateForAccount(activeAccountKey);
-        }
+//        String key = getAccountKey();
+//        if (key != null) {
+//            activeAccountKey = key;
+//            loadStateForAccount(activeAccountKey);
+//            persistIfPossible();
+//        }
+        log.info("AccountHash at startup: state={}, hash={}",
+                client.getGameState(),
+                client.getAccountHash());
+        log.info("AccountKey at startup: {}", getAccountKey());
+
 
         clientThread.invokeLater(this::reloadTaskPackInternal);
     }
@@ -121,7 +132,7 @@ public class XtremeTaskerPlugin extends Plugin {
         mouseManager.unregisterMouseWheelListener(overlay.getMouseWheelListener());
 
         currentTask = null;
-        pendingCurrentTaskId = null;
+        currentTaskId = null;
 
         manualCompletedTaskIds.clear();
         syncedCompletedTaskIds.clear();
@@ -190,18 +201,29 @@ public class XtremeTaskerPlugin extends Plugin {
     public void onGameStateChanged(GameStateChanged event) {
         GameState gs = event.getGameState();
 
-        if (gs == GameState.LOGGED_IN) {
+        if (gs == GameState.LOGGED_IN)
+        {
             String key = getAccountKey();
-            if (key != null && !key.equals(activeAccountKey)) {
-                if (activeAccountKey != null) {
+            if (key != null && !key.equals(activeAccountKey))
+            {
+                if (activeAccountKey != null)
+                {
                     saveStateForAccount(activeAccountKey);
                 }
 
                 activeAccountKey = key;
                 loadStateForAccount(activeAccountKey);
                 log.info("Loaded XtremeTasker state for {}", activeAccountKey);
+
+                // IMPORTANT: if user did stuff before key was ready, flush now
+                if (dirty)
+                {
+                    saveStateForAccount(activeAccountKey);
+                    dirty = false;
+                }
             }
         }
+
 
         if (gs == GameState.LOGIN_SCREEN || gs == GameState.HOPPING) {
             if (activeAccountKey != null) {
@@ -233,67 +255,89 @@ public class XtremeTaskerPlugin extends Plugin {
             return;
         }
 
+        log.info("SAVE state key={}, currentTaskId={}, manualDone={}, syncedDone={}",
+                stateConfigKeyForAccount(accountKey),
+                currentTaskId,
+                manualCompletedTaskIds.size(),
+                syncedCompletedTaskIds.size());
+
         PersistedState state = new PersistedState();
         state.setManualCompletedTaskIds(new HashSet<>(manualCompletedTaskIds));
         state.setSyncedCompletedTaskIds(new HashSet<>(syncedCompletedTaskIds));
-
-        String curId = (currentTask != null) ? currentTask.getId() : pendingCurrentTaskId;
-        state.setCurrentTaskId(curId);
+        state.setCurrentTaskId(currentTaskId);
 
         String key = stateConfigKeyForAccount(accountKey);
         configManager.setConfiguration(CONFIG_GROUP, key, gson.toJson(state));
     }
 
-    private void loadStateForAccount(String accountKey) {
+    private void loadStateForAccount(String accountKey)
+    {
         manualCompletedTaskIds.clear();
         syncedCompletedTaskIds.clear();
         currentTask = null;
-        pendingCurrentTaskId = null;
+        currentTaskId = null;
 
-        if (accountKey == null) {
+
+        if (accountKey == null)
+        {
             rebuildTierCounts();
             return;
         }
 
         String json = configManager.getConfiguration(CONFIG_GROUP, stateConfigKeyForAccount(accountKey));
-        if (json == null || json.trim().isEmpty()) {
+        if (json == null || json.trim().isEmpty())
+        {
             rebuildTierCounts();
             return;
         }
 
-        try {
+        try
+        {
             PersistedState state = gson.fromJson(json, PersistedState.class);
-            if (state != null) {
+            if (state != null)
+            {
                 if (state.getManualCompletedTaskIds() != null)
+                {
                     manualCompletedTaskIds.addAll(state.getManualCompletedTaskIds());
+                }
                 if (state.getSyncedCompletedTaskIds() != null)
+                {
                     syncedCompletedTaskIds.addAll(state.getSyncedCompletedTaskIds());
-                pendingCurrentTaskId = state.getCurrentTaskId();
+                }
+                currentTaskId = state.getCurrentTaskId();
             }
-        } catch (Exception e) {
+        }
+        catch (Exception e)
+        {
             log.warn("Failed to parse persisted state for account {}. Resetting.", accountKey, e);
             manualCompletedTaskIds.clear();
             syncedCompletedTaskIds.clear();
             currentTask = null;
-            pendingCurrentTaskId = null;
+            currentTaskId = null;
         }
 
         resolveCurrentTaskIfPossible();
         rebuildTierCounts();
     }
 
-    private void resolveCurrentTaskIfPossible() {
-        if (pendingCurrentTaskId == null || tasks.isEmpty()) {
+
+    private void resolveCurrentTaskIfPossible()
+    {
+        if (currentTaskId == null || tasks.isEmpty())
+        {
             return;
         }
 
-        String id = pendingCurrentTaskId;
+        String id = currentTaskId;
         currentTask = tasks.stream().filter(t -> id.equals(t.getId())).findFirst().orElse(null);
 
-        if (currentTask != null) {
-            pendingCurrentTaskId = null;
+        // If we can't resolve it (pack changed), don't keep saving a dead ID forever
+        if (currentTask == null)
+        {
+            currentTaskId = null;
         }
     }
+
 
     // ---------- tier counts / progress ----------
 
@@ -363,38 +407,49 @@ public class XtremeTaskerPlugin extends Plugin {
         return available.get(random.nextInt(available.size()));
     }
 
-    public void rollRandomTaskAndPersist() {
-        if (!hasTaskPackLoaded()) {
+    public void rollRandomTaskAndPersist()
+    {
+        if (!hasTaskPackLoaded())
+        {
             chat("No tasks loaded. Load tasks in Rules tab");
             return;
         }
 
         XtremeTask cur = getCurrentTask();
-        if (cur != null && !isTaskCompleted(cur)) {
+        if (cur != null && !isTaskCompleted(cur))
+        {
             return;
         }
 
         XtremeTask newTask = rollRandomTask();
         setCurrentTask(newTask);
 
-        pendingCurrentTaskId = (newTask != null) ? newTask.getId() : null;
-        persistIfPossible();
+        currentTaskId = (newTask != null) ? newTask.getId() : null;
+        dirty = true;
+        persistIfPossible(); // writes immediately if activeAccountKey != null
     }
 
-    public void completeCurrentTaskAndPersist() {
+    public void completeCurrentTaskAndPersist()
+    {
         XtremeTask cur = getCurrentTask();
         if (cur == null) return;
 
         manualCompletedTaskIds.add(cur.getId());
 
+        // Clear current when done so it won't pin on restart
+        currentTask = null;
+        currentTaskId = null;
+
         rebuildTierCounts();
+        dirty = true;
         persistIfPossible();
     }
 
-    public void toggleTaskCompletedAndPersist(XtremeTask task) {
+    public void toggleTaskCompletedAndPersist(XtremeTask task)
+    {
         String id = task.getId();
-
-        if (id == null || id.trim().isEmpty()) {
+        if (id == null || id.trim().isEmpty())
+        {
             log.warn("Refusing to toggle completion for task with null/blank id: {}", task.getName());
             return;
         }
@@ -403,13 +458,47 @@ public class XtremeTaskerPlugin extends Plugin {
         else manualCompletedTaskIds.add(id);
 
         rebuildTierCounts();
+        dirty = true;
         persistIfPossible();
     }
 
-    private void persistIfPossible() {
-        if (activeAccountKey != null) {
-            saveStateForAccount(activeAccountKey);
+    @Subscribe
+    public void onGameTick(net.runelite.api.events.GameTick tick)
+    {
+        if (activeAccountKey == null)
+        {
+            return;
         }
+
+        if (!dirty)
+        {
+            flushTickCounter = 0;
+            return;
+        }
+
+        flushTickCounter++;
+        if (flushTickCounter >= FLUSH_EVERY_TICKS)
+        {
+            flushTickCounter = 0;
+            saveStateForAccount(activeAccountKey);
+            dirty = false;
+            log.debug("Flushed XtremeTasker state for {}", activeAccountKey);
+        }
+    }
+
+    private void persistIfPossible()
+    {
+        if (!dirty || activeAccountKey == null)
+        {
+            return;
+        }
+
+        // Run the write on the client thread and block until it executes.
+        clientThread.invoke(() ->
+        {
+            saveStateForAccount(activeAccountKey);
+            dirty = false;
+        });
     }
 
     // ---------- JSON task pack loading ----------
@@ -482,9 +571,16 @@ public class XtremeTaskerPlugin extends Plugin {
             manualCompletedTaskIds.retainAll(validIds);
             syncedCompletedTaskIds.retainAll(validIds);
 
-            if (currentTask != null && !validIds.contains(currentTask.getId())) {
+            if (currentTaskId != null && !validIds.contains(currentTaskId))
+            {
+                currentTaskId = null;
                 currentTask = null;
             }
+            else if (currentTask != null && !validIds.contains(currentTask.getId()))
+            {
+                currentTask = null;
+            }
+
 
             resolveCurrentTaskIfPossible();
 

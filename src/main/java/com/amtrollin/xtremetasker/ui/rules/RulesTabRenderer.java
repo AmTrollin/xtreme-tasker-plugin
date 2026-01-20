@@ -16,6 +16,12 @@ public final class RulesTabRenderer
     private final Color uiGold;
     private final Color uiTextDim;
 
+    private static final String TASKER_FAQ_URL =
+            "https://docs.google.com/document/d/e/2PACX-1vTHfXHzMQFbt_iYAP-O88uRhhz3wigh1KMiiuomU7ftli-rL_c3bRqfGYmUliE1EHcIr3LfMx2UTf2U/pub";
+
+    private static final String LINE_TASKER_FAQ = "TaskerFAQ";
+    private static final String LINE_BUTTON_ROW = "[BUTTON_ROW]";
+
     public RulesTabRenderer(
             int panelWidth,
             int panelPadding,
@@ -48,6 +54,7 @@ public final class RulesTabRenderer
     )
     {
         RulesTabLayout layout = new RulesTabLayout();
+        layout.taskerFaqLinkBounds.setBounds(0, 0, 0, 0);
 
         int bx = panelX + panelPadding;
         int viewportY = cursorYBaseline - fm.getAscent();
@@ -77,7 +84,7 @@ public final class RulesTabRenderer
         {
             String line = lines.get(idx);
 
-            if ("[BUTTON_ROW]".equals(line))
+            if (LINE_BUTTON_ROW.equals(line))
             {
                 int btnW = viewportW - 8;
                 int btnH = rowHeight + 10;
@@ -85,21 +92,28 @@ public final class RulesTabRenderer
                 int by = (drawY - fm.getAscent());
                 layout.reloadButtonBounds.setBounds(bx, by, btnW, btnH);
 
-                // Overlay can draw the button using its drawButton helper
+                // Overlay draws the button using its drawButton helper
                 drawY += rb;
                 continue;
             }
 
-            if (line.equals("Rules")
-                    || line.equals("Boss combat training allowance")
-                    || line.equals("Official Tasker rules"))
-            {
-                g.setColor(uiGold);
-            }
-            else if (line.trim().isEmpty())
+            if (line.trim().isEmpty())
             {
                 drawY += rb;
                 continue;
+            }
+
+            boolean isTitle =
+                    line.equals("Rules")
+                            || line.equals("Boss combat training allowance")
+                            || line.equals("Official Tasker rules");
+
+            boolean isTaskerFaqLink = LINE_TASKER_FAQ.equals(line);
+
+            // color
+            if (isTitle || isTaskerFaqLink)
+            {
+                g.setColor(uiGold);
             }
             else
             {
@@ -118,6 +132,22 @@ public final class RulesTabRenderer
                 int underlineY = drawY + 1;
                 g.drawLine(centerX, underlineY, centerX + textW, underlineY);
             }
+            else if (isTaskerFaqLink)
+            {
+                // Draw like a link + store bounds for click handling
+                g.drawString(drawText, bx, drawY);
+
+                int w = fm.stringWidth(drawText);
+                int underlineY = drawY + 1;
+                g.drawLine(bx, underlineY, bx + w, underlineY);
+
+                layout.taskerFaqLinkBounds.setBounds(
+                        bx,
+                        drawY - fm.getAscent(),
+                        w,
+                        fm.getHeight()
+                );
+            }
             else
             {
                 g.drawString(drawText, bx, drawY);
@@ -127,7 +157,6 @@ public final class RulesTabRenderer
         }
 
         g.setClip(oldClip);
-
         return layout;
     }
 
@@ -144,13 +173,14 @@ public final class RulesTabRenderer
                         + "suggested skills. You must do this through the Slayer skill, with any slayer master(s) "
                         + "of your choosing.\n\n"
                         + "It's heavily recommended to be strategic when choosing your slayer master(s) for supplies "
-                        + "and equipment throughout the grind. For example, Krystillia's slayer list includes mammoths "
-                        + "which drop single-dose prayer potions, which would be especially useful for bosses that "
+                        + "and equipment throughout the grind. For example, Krystilia's slayer list includes mammoths "
+                        + "which drop single-dose prayer potions. This would be especially useful for bosses that "
                         + "require overhead prayers to kill them.",
                 fm,
                 maxWidth
         ));
         lines.add("");
+
         lines.add("Official Tasker rules");
         lines.addAll(wrapText(
                 "Follow all current official Tasker rules, as written in the TaskerFAQ linked below. "
@@ -159,8 +189,10 @@ public final class RulesTabRenderer
                 maxWidth
         ));
         lines.add("");
-
-        lines.add("[BUTTON_ROW]");
+        lines.add(LINE_TASKER_FAQ);
+        lines.add("");
+        lines.add("");
+        lines.add(LINE_BUTTON_ROW);
         lines.add("");
 
         return lines;
@@ -221,5 +253,11 @@ public final class RulesTabRenderer
     private static int clamp(int v, int max)
     {
         return Math.max(0, Math.min(max, v));
+    }
+
+    // Expose URL so overlay can use it for clicks without duplicating string
+    public static String taskerFaqUrl()
+    {
+        return TASKER_FAQ_URL;
     }
 }

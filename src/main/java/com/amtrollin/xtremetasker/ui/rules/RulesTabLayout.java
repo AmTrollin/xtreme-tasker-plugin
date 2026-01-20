@@ -7,4 +7,6 @@ public final class RulesTabLayout
     public final Rectangle viewportBounds = new Rectangle();
     public final Rectangle reloadButtonBounds = new Rectangle();
     public int totalContentRows = 0;
+    public final Rectangle taskerFaqLinkBounds = new Rectangle();
+
 }

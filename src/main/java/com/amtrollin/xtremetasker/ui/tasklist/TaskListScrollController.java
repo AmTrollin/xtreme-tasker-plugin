@@ -6,6 +6,8 @@ public final class TaskListScrollController
 
     public int offsetRows = 0;
     public double wheelRemainderRows = 0.0;
+    private int suppressEnsureTicks = 0;
+
 
     public TaskListScrollController(int scrollRowsPerNotch)
     {
@@ -44,18 +46,9 @@ public final class TaskListScrollController
             return offsetRows;
         }
 
-        int newOffset = clamp(offsetRows + deltaRows, maxOffset);
-
-        // Keep selection coupled to scroll so ensureSelectionVisible doesn't snap back
-        if (selection != null)
-        {
-            int sel = selection.getSelectedIndex();
-            int moved = newOffset - offsetRows;
-            sel = clamp(sel + moved, totalRows - 1);
-            selection.setSelectedIndex(sel);
-        }
-
-        offsetRows = newOffset;
+        offsetRows = clamp(offsetRows + deltaRows, maxOffset);
+        // suppress ensureSelectionVisible for a few frames/ticks so scroll doesn't snap back
+        suppressEnsureTicks = 6; // tune: 4-10 is fine
         return offsetRows;
     }
 
@@ -64,6 +57,12 @@ public final class TaskListScrollController
      */
     public void ensureSelectionVisible(int totalRows, int viewportH, int rowBlock, SelectionModel selection)
     {
+        if (suppressEnsureTicks > 0)
+        {
+            suppressEnsureTicks--;
+            return;
+        }
+
         if (selection == null || totalRows <= 0)
         {
             return;
@@ -91,6 +90,8 @@ public final class TaskListScrollController
 
         offsetRows = clamp(offsetRows, maxOffset);
     }
+
+
 
     public void reset()
     {

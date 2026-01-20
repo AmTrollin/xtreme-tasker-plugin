@@ -1,11 +1,15 @@
 package com.amtrollin.xtremetasker.ui.tasklist;
 
+import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
 
 import java.awt.*;
 import java.util.List;
 import java.util.function.Function;
+
+import static com.amtrollin.xtremetasker.enums.TaskTier.*;
+import static com.amtrollin.xtremetasker.tasklist.TaskListPipeline.safe;
 
 public final class TaskRowsRenderer {
     private final int panelWidth;
@@ -84,6 +88,20 @@ public final class TaskRowsRenderer {
     public int rowBlock() {
         return rowHeight + listRowSpacing;
     }
+    private static String prettyTier(TaskTier t)
+    {
+        if (t == null) return "";
+        switch (t)
+        {
+            case EASY: return "Easy";
+            case MEDIUM: return "Medium";
+            case HARD: return "Hard";
+            case ELITE: return "Elite";
+            case MASTER: return "Master";
+            case GRANDMASTER: return "Grandmaster";
+            default: return t.name();
+        }
+    }
 
     /**
      * Renders the task list and returns layout containing viewport + per-row bounds.
@@ -106,7 +124,8 @@ public final class TaskRowsRenderer {
             int hoverMouseX,
             int hoverMouseY,
             Function<String, Float> animProgressProvider,
-            Function<XtremeTask, Boolean> isCompleted
+            Function<XtremeTask, Boolean> isCompleted,
+            boolean showTierPrefix
     ) {
         TaskRowsLayout layout = new TaskRowsLayout();
         layout.rowBounds.clear();
@@ -180,16 +199,26 @@ public final class TaskRowsRenderer {
             int textMaxW = Math.max(0, viewportW - taskTextPadLeft - 10);
 
             assert task != null;
-            String taskText = XtremeTaskerOverlay.getString(task.getName(), fm, textMaxW);
+            String taskName = XtremeTaskerOverlay.getString(safe(task.getName()), fm, textMaxW);
+
+            if (showTierPrefix)
+            {
+                String tier = (task.getTier() == null) ? "" : task.getTier().name();
+                if (!tier.isEmpty())
+                {
+                    taskName = "[" + prettyTier(task.getTier()) + "] " + taskName;
+                }
+            }
+
 
             g.setColor(completed
                     ? new Color(uiTextDim.getRed(), uiTextDim.getGreen(), uiTextDim.getBlue(), 220)
                     : uiText);
 
-            g.drawString(taskText, textX, drawY);
+            g.drawString(taskName, textX, drawY);
 
             if (completed) {
-                int textW = fm.stringWidth(taskText);
+                int textW = fm.stringWidth(taskName);
                 int strikeY = drawY - (fm.getAscent() / 2) + 1;
 
                 g.setColor(strikeColor);

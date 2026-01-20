@@ -82,7 +82,8 @@ public interface OverlayInputAccess
 
     boolean handleTasksKey(java.awt.event.KeyEvent e);
     boolean handleCurrentKey(java.awt.event.KeyEvent e);
-    boolean handleSearchKey(java.awt.event.KeyEvent e);
 
     List<XtremeTask> getSortedTasksForTier(TaskTier tier);
+    int taskRowBlock();
+
 }
