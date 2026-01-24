@@ -1,4 +1,4 @@
-package com.amtrollin.xtremetasker.persistence;
+package com.amtrollin.xtremetasker.models.persistence;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
