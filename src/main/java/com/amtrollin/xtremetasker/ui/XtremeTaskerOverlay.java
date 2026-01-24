@@ -579,11 +579,32 @@ public class XtremeTaskerOverlay extends Overlay {
         rulesLayout.reloadButtonBounds.setBounds(layout.reloadButtonBounds);
         rulesLayout.totalContentRows = layout.totalContentRows;
         rulesLayout.taskerFaqLinkBounds.setBounds(layout.taskerFaqLinkBounds);
+        rulesLayout.syncProgressButtonBounds.setBounds(layout.syncProgressButtonBounds);
 
         rulesViewportBounds.setBounds(layout.viewportBounds);
 
         if (rulesLayout.reloadButtonBounds.width > 0) {
             drawButton(g, rulesLayout.reloadButtonBounds, "Reload tasks list", true);
+        }
+        if (rulesLayout.syncProgressButtonBounds.width > 0) {
+            drawButton(g, rulesLayout.syncProgressButtonBounds, "Sync In Game Progress", false); // disabled placeholder
+        }
+
+        // Hover tooltip for disabled "Sync In Game Progress"
+        net.runelite.api.Point rlMouse = client.getMouseCanvasPosition();
+        int mx = (rlMouse == null) ? -1 : rlMouse.getX();
+        int my = (rlMouse == null) ? -1 : rlMouse.getY();
+
+        if (rulesLayout.syncProgressButtonBounds.contains(mx, my))
+        {
+            Font old = g.getFont();
+            g.setFont(FontManager.getRunescapeSmallFont());
+            FontMetrics tfm = g.getFontMetrics();
+
+            Rectangle r = rulesLayout.syncProgressButtonBounds;
+
+
+            g.setFont(old);
         }
 
         if (rulesLayout.taskerFaqLinkBounds.width > 0)
@@ -610,7 +631,7 @@ public class XtremeTaskerOverlay extends Overlay {
             }
 
             String tierTag = " [" + current.getTier().name() + "]";
-            String line = (currentCompleted ? "(Marked completed in task tab) " : "Current: ") + current.getName() + tierTag;
+            String line = (currentCompleted ? "[Marked completed in task tab] " : "Current: ") + current.getName() + tierTag;
             return getString(line, fm, maxW);
         }
 
@@ -1672,10 +1693,14 @@ public class XtremeTaskerOverlay extends Overlay {
             FontMetrics tfm = g.getFontMetrics();
 
             String tip = "Click to mark incomplete";
-            drawTooltip(g, tfm, tip,
-                    detailsToggleBounds.x + (detailsToggleBounds.width / 2) - (tfm.stringWidth(tip) / 2) - 8,
+            drawTooltip(
+                    g,
+                    tfm,
+                    tip,
+                    detailsToggleBounds.x + (detailsToggleBounds.width / 2),  // center of button
                     detailsToggleBounds.y
             );
+
 
             g.setFont(old);
         }
@@ -1820,22 +1845,22 @@ public class XtremeTaskerOverlay extends Overlay {
         int w = tw + padX * 2;
         int h = fm.getHeight() + padY * 2;
 
-        // Position tooltip slightly above anchor
-        int x = anchorX;
+        // Anchor-relative positioning (this is the key part)
+        int x = anchorX - w / 2;
         int y = anchorY - h - 8;
 
-        // Clamp to panel bounds so it doesn't go off-panel
-        x = Math.max(panelBounds.x + 6, Math.min(x, panelBounds.x + panelBounds.width - w - 6));
-        y = Math.max(panelBounds.y + 6, Math.min(y, panelBounds.y + panelBounds.height - h - 6));
+        // Clamp to panel bounds
+        x = Math.max(panelBounds.x + 6,
+                Math.min(x, panelBounds.x + panelBounds.width - w - 6));
+        y = Math.max(panelBounds.y + 6,
+                Math.min(y, panelBounds.y + panelBounds.height - h - 6));
 
         Rectangle r = new Rectangle(x, y, w, h);
 
-        // Background + bevel
         drawBevelBox(g, r, new Color(20, 16, 10, 245));
         g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 120));
         g.drawRect(r.x, r.y, r.width, r.height);
 
-        // Text
         g.setColor(P.UI_TEXT);
         g.drawString(text, r.x + padX, r.y + padY + fm.getAscent());
     }

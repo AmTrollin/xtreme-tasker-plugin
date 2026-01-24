@@ -323,6 +323,12 @@ public final class OverlayMouseHandler extends MouseAdapter {
                 e.consume();
                 return e;
             }
+            if (a.rulesLayout().syncProgressButtonBounds.contains(p)) {
+                // Placeholder: disabled for now, do nothing (or show a message later)
+                e.consume();
+                return e;
+            }
+
             if (a.rulesLayout().taskerFaqLinkBounds.contains(p)) {
                 LinkBrowser.browse(RulesTabRenderer.taskerFaqUrl());
                 e.consume();
@@ -354,7 +360,9 @@ public final class OverlayMouseHandler extends MouseAdapter {
                         && (
                         a.rulesLayout().taskerFaqLinkBounds.contains(p)
                                 || a.rulesLayout().reloadButtonBounds.contains(p)
+                                || a.rulesLayout().syncProgressButtonBounds.contains(p)
                 );
+
 
         if (hovering && !handCursorActive)
         {

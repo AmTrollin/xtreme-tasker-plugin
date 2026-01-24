@@ -93,7 +93,7 @@ public class TaskControlsRenderer
         int rowW = panelW - 2 * panelPadding;
 
         final String FILTERS_HEADER = "-- Filters --";
-        final String SORTS_HEADER = "-- Sort --";
+        final String SORTS_HEADER = "-- Sorts --";
         final String SOURCE_LABEL = "Source:";
         final String STATUS_LABEL = "Status:";
         final String TIER_LABEL = "Tier:";
