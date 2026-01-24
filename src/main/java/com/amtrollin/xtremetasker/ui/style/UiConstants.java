@@ -22,7 +22,7 @@ public final class UiConstants
     public static final int STATUS_PIP_SIZE = 9;
     public static final int STATUS_GUTTER_W = 16;
     public static final int STATUS_PIP_PAD_LEFT = 4;
-    public static final int TASK_TEXT_PAD_LEFT = STATUS_GUTTER_W;
+    public static final int TASK_TEXT_PAD_LEFT = STATUS_GUTTER_W + STATUS_PIP_PAD_LEFT;
 
     // Wiki icon sizing (if you still use it)
     public static final int WIKI_ICON_SIZE = 38;

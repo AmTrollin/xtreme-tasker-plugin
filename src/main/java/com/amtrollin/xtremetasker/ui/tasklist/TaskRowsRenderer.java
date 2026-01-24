@@ -38,6 +38,10 @@ public final class TaskRowsRenderer {
     private final Color edgeLight;
     private final Color edgeDark;
 
+    // --- Visual boost (Option 2: more prominent checkbox/pip without changing layout) ---
+    // Increase this to make the circle larger. Keep small so it doesn't collide with text.
+    private static final int PIP_VISUAL_BOOST_PX = 4; // try 2–6; 4 is a nice "more prominent" bump
+
     public TaskRowsRenderer(
             int panelWidth,
             int panelPadding,
@@ -88,6 +92,7 @@ public final class TaskRowsRenderer {
     public int rowBlock() {
         return rowHeight + listRowSpacing;
     }
+
     private static String prettyTier(TaskTier t)
     {
         if (t == null) return "";
@@ -188,11 +193,28 @@ public final class TaskRowsRenderer {
             int pipCenterX = rowBounds.x + statusPipPadLeft + (statusPipSize / 2);
             int pipCenterY = drawY - (fm.getAscent() / 2) + (fm.getDescent() / 2);
 
+            int hitSize = Math.max(statusPipSize + 10, 18);
+            layout.checkboxBounds.put(task, new Rectangle(
+                    pipCenterX - hitSize / 2,
+                    pipCenterY - hitSize / 2,
+                    hitSize,
+                    hitSize
+            ));
+
+            // Checkbox hit target (bigger than the visual pip)
+            int hitX = pipCenterX - (hitSize / 2);
+            int hitY = pipCenterY - (hitSize / 2);
+
+            Rectangle hit = new Rectangle(hitX, hitY, hitSize, hitSize);
+            layout.checkboxBounds.put(task, hit);
+
             float anim = 0f;
             if (animProgressProvider != null && task != null) {
                 Float v = animProgressProvider.apply(task.getId());
                 anim = v == null ? 0f : v;
             }
+
+            // Draw slightly larger pip for better prominence (visual only)
             drawStatusPip(g, pipCenterX, pipCenterY, completed, anim);
 
             int textX = viewportX + taskTextPadLeft;
@@ -209,7 +231,6 @@ public final class TaskRowsRenderer {
                     taskName = "[" + prettyTier(task.getTier()) + "] " + taskName;
                 }
             }
-
 
             g.setColor(completed
                     ? new Color(uiTextDim.getRed(), uiTextDim.getGreen(), uiTextDim.getBlue(), 220)
@@ -239,14 +260,22 @@ public final class TaskRowsRenderer {
     }
 
     private void drawStatusPip(Graphics2D g, int cx, int cy, boolean done, float animProgress) {
-        int r = statusPipSize / 2;
+        // Visual size boost (does not change layout spacing)
+        int drawSize = Math.max(6, statusPipSize + PIP_VISUAL_BOOST_PX);
+        int r = drawSize / 2;
+
         int x = cx - r;
         int y = cy - r;
 
+        // Slightly thicker ring for readability: draw twice (offset by 1px)
         g.setColor(done ? pipDoneRing : pipRing);
-        g.drawOval(x, y, statusPipSize, statusPipSize);
+        g.drawOval(x, y, drawSize, drawSize);
+        g.drawOval(x + 1, y + 1, drawSize - 2, drawSize - 2);
 
+        // Add a faint inner ring when not done (makes "toggle target" feel more obvious)
         if (!done) {
+            g.setColor(new Color(pipRing.getRed(), pipRing.getGreen(), pipRing.getBlue(), 60));
+            g.drawOval(x + 2, y + 2, drawSize - 4, drawSize - 4);
             return;
         }
 
@@ -257,7 +286,8 @@ public final class TaskRowsRenderer {
             alphaBoost = (int) (60 * (1.0f - animProgress));
         }
 
-        int fillSize = Math.max(1, Math.round((statusPipSize - 2) * scale));
+        int fillBase = Math.max(1, drawSize - 2);
+        int fillSize = Math.max(1, Math.round(fillBase * scale));
         int fx = cx - (fillSize / 2);
         int fy = cy - (fillSize / 2);
 
@@ -271,14 +301,21 @@ public final class TaskRowsRenderer {
         g.setColor(fill);
         g.fillOval(fx, fy, fillSize, fillSize);
 
-        // check mark
+        // check mark (scaled to drawSize)
         g.setColor(new Color(30, 25, 18, 220));
-        int x1 = x + 2;
-        int y1 = y + r + 1;
-        int x2 = x + r - 1;
-        int y2 = y + statusPipSize - 3;
-        int x3 = x + statusPipSize - 2;
-        int y3 = y + 2;
+
+        // Use proportions based on drawSize so it stays centered and crisp
+        int left = x;
+        int top = y;
+
+        int x1 = left + Math.max(2, drawSize / 6);
+        int y1 = top + (drawSize / 2) + Math.max(1, drawSize / 12);
+
+        int x2 = left + (drawSize / 2) - Math.max(1, drawSize / 10);
+        int y2 = top + drawSize - Math.max(3, drawSize / 5);
+
+        int x3 = left + drawSize - Math.max(2, drawSize / 6);
+        int y3 = top + Math.max(2, drawSize / 6);
 
         g.drawLine(x1, y1, x2, y2);
         g.drawLine(x2, y2, x3, y3);

@@ -1,5 +1,6 @@
 package com.amtrollin.xtremetasker.ui.current;
 
+import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
@@ -69,7 +70,8 @@ public final class CurrentTabRenderer
             Function<TaskTier, Integer> tierPercent, // optional, can be null
             Function<XtremeTask, String> currentLineProvider,
             Function<TaskTier, List<XtremeTask>> tasksForTierProvider,
-            TaskTier tierForProgress
+            TaskTier tierForProgress,
+            TaskSource currentSource
     )
     {
         CurrentTabLayout layout = new CurrentTabLayout();
@@ -102,6 +104,12 @@ public final class CurrentTabRenderer
 
         g.setColor(uiText);
         g.drawString(currentLine, panelX + panelPadding, cursorYBaseline);
+
+        // draw CA/CL pill at top-right on this row
+        if (!rolling)
+        {
+            drawSourceBadgeNearText(g, fm, panelX, cursorYBaseline, currentSource, currentLine);
+        }
         cursorYBaseline += rowHeight + 10;
 
         if (rolling)
@@ -289,4 +297,59 @@ public final class CurrentTabRenderer
 
         return lines;
     }
+
+    private void drawSourceBadgeNearText(
+            Graphics2D g, FontMetrics fm,
+            int panelX, int rowBaselineY,
+            TaskSource src,
+            String lineText
+    )
+    {
+        if (src == null) return;
+
+        final int w = 36;
+        final int h = 20;
+        final int gap = 8;
+
+        String text = (src == TaskSource.COMBAT_ACHIEVEMENT) ? "CA" : "CL";
+
+        int contentLeft = panelX + panelPadding;
+        int contentRight = panelX + panelWidth - panelPadding;
+
+        int lineW = (lineText == null) ? 0 : fm.stringWidth(lineText);
+
+        // Prefer placing just after the text...
+        int x = contentLeft + lineW + gap;
+
+        // ...but clamp so it never goes past the content right edge
+        x = Math.min(x, contentRight - w);
+
+        final int verticalNudge = -2; // try -1 or -2
+
+        int y = (rowBaselineY - fm.getAscent())
+                + (rowHeight - h) / 2
+                + verticalNudge;
+
+
+        g.setColor(new Color(32, 26, 17, 235));
+        g.fillRoundRect(x, y, w, h, 6, 6);
+
+        g.setColor(new Color(uiGold.getRed(), uiGold.getGreen(), uiGold.getBlue(), 200));
+        g.drawRoundRect(x, y, w, h, 6, 6);
+
+        Font old = g.getFont();
+        g.setFont(old.deriveFont(Font.BOLD, 12f));
+        FontMetrics bfm = g.getFontMetrics();
+
+        int tw = bfm.stringWidth(text);
+        int tx = x + (w - tw) / 2;
+        int ty = y + ((h - bfm.getHeight()) / 2) + bfm.getAscent();
+
+        g.setColor(new Color(uiText.getRed(), uiText.getGreen(), uiText.getBlue(), 235));
+        g.drawString(text, tx, ty);
+
+        g.setFont(old);
+    }
+
+
 }

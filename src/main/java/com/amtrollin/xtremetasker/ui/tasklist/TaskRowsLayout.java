@@ -9,5 +9,10 @@ import java.util.Map;
 public final class TaskRowsLayout
 {
     public final Rectangle viewportBounds = new Rectangle();
+
+    /** Full clickable row bounds (used for selection + row click). */
     public final Map<XtremeTask, Rectangle> rowBounds = new HashMap<>();
+
+    /** Click target for the checkbox/pip area (used to toggle). */
+    public final Map<XtremeTask, Rectangle> checkboxBounds = new HashMap<>();
 }

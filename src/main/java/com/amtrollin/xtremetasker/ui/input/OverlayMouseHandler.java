@@ -45,6 +45,59 @@ public final class OverlayMouseHandler extends MouseAdapter {
             return e;
         }
 
+        // ------------------------------------------------------------
+        // DETAILS POPUP click handling (highest priority)
+        // ------------------------------------------------------------
+        if (a.isTaskDetailsOpen() && button == MouseEvent.BUTTON1) {
+            // Close if clicking outside the popup
+            if (a.taskDetailsBounds().width > 0 && a.taskDetailsBounds().height > 0
+                    && !a.taskDetailsBounds().contains(p)) {
+                a.closeTaskDetails();
+                e.consume();
+                return e;
+            }
+
+            // Close button
+            if (a.taskDetailsCloseBounds().contains(p)) {
+                a.closeTaskDetails();
+                e.consume();
+                return e;
+            }
+
+            // Wiki button
+            if (a.taskDetailsWikiBounds().contains(p)) {
+                XtremeTask t = a.taskDetailsTask();
+                if (t != null) {
+                    String url = t.getWikiUrl();
+                    if (url != null && !url.trim().isEmpty()) {
+                        LinkBrowser.browse(url);
+                    }
+                }
+                e.consume();
+                return e;
+            }
+
+            // Toggle button in popup (optional UI)
+            if (a.taskDetailsToggleBounds().contains(p)) {
+                XtremeTask t = a.taskDetailsTask();
+                if (t != null) {
+                    boolean wasDone = a.plugin().isTaskCompleted(t);
+                    if (!wasDone) {
+                        a.animations().startCompletionAnim(t.getId());
+                    }
+                    a.plugin().toggleTaskCompletedAndPersist(t);
+                }
+                e.consume();
+                return e;
+            }
+
+            // Click inside popup consumes click (don't let it leak to rows)
+            if (a.taskDetailsBounds().contains(p)) {
+                e.consume();
+                return e;
+            }
+        }
+
         // click outside closes (do this early)
         if (button == MouseEvent.BUTTON1
                 && a.panelBounds().width > 0 && a.panelBounds().height > 0
@@ -199,29 +252,64 @@ public final class OverlayMouseHandler extends MouseAdapter {
             }
         }
 
-        // TASKS list row click toggle
+        // ------------------------------------------------------------
+        // TASKS list row click behavior (checkbox toggles, row opens)
+        // ------------------------------------------------------------
         if (a.activeTab() == OverlayInputAccess.MainTab.TASKS
-                && (button == MouseEvent.BUTTON1 || button == MouseEvent.BUTTON3)) {
-            for (Map.Entry<XtremeTask, Rectangle> entry : a.taskRowBounds().entrySet()) {
-                if (entry.getValue().contains(p)) {
-                    XtremeTask task = entry.getKey();
+                && (button == MouseEvent.BUTTON1 || button == MouseEvent.BUTTON3))
+        {
+            for (Map.Entry<XtremeTask, Rectangle> entry : a.taskRowBounds().entrySet())
+            {
+                if (!entry.getValue().contains(p))
+                {
+                    continue;
+                }
 
+                XtremeTask task = entry.getKey();
+                if (task == null)
+                {
+                    return e;
+                }
+
+                // Anchor selection to the clicked task (by id) in the current list
+                List<XtremeTask> tasksBefore = a.getSortedTasksForTier(a.activeTier());
+                a.selectionModel().setSelectionToTask(a.activeTier(), tasksBefore, task);
+
+                // Checkbox region?
+                Rectangle cb = a.taskCheckboxBounds().get(task);
+                boolean clickedCheckbox = (cb != null && cb.contains(p));
+
+                // Left click checkbox => toggle
+                if (button == MouseEvent.BUTTON1 && clickedCheckbox)
+                {
                     boolean wasDone = a.plugin().isTaskCompleted(task);
                     if (!wasDone) {
                         a.animations().startCompletionAnim(task.getId());
                     }
 
-                    // Anchor selection to the clicked task (by id) in the current list
-                    List<XtremeTask> tasksBefore = a.getSortedTasksForTier(a.activeTier());
-                    a.selectionModel().setSelectionToTask(a.activeTier(), tasksBefore, task);
-
-                    // Toggle completion (can reorder list depending on sorting)
                     a.plugin().toggleTaskCompletedAndPersist(task);
 
-                    // Re-anchor selection to the same task in the new order (prevents selection “jump”)
+                    // Re-anchor selection after reorder
                     List<XtremeTask> tasksAfter = a.getSortedTasksForTier(a.activeTier());
                     a.selectionModel().setSelectionToTask(a.activeTier(), tasksAfter, task);
 
+                    e.consume();
+                    return e;
+                }
+
+                // Left click row (not checkbox) => open details
+                if (button == MouseEvent.BUTTON1 && !clickedCheckbox)
+                {
+                    a.openTaskDetails(task);
+                    e.consume();
+                    return e;
+                }
+
+                // Optional: right-click could toggle or open.
+                // I recommend: right-click also opens details (consistent).
+                if (button == MouseEvent.BUTTON3)
+                {
+                    a.openTaskDetails(task);
                     e.consume();
                     return e;
                 }
@@ -252,25 +340,36 @@ public final class OverlayMouseHandler extends MouseAdapter {
     private boolean handCursorActive = false;
 
     @Override
-    public MouseEvent mouseMoved(MouseEvent e) {
-        if (!a.plugin().isOverlayEnabled() || !a.isPanelOpen()) {
+    public MouseEvent mouseMoved(MouseEvent e)
+    {
+        if (!a.plugin().isOverlayEnabled() || !a.isPanelOpen())
+        {
             return e;
         }
 
+        Point p = e.getPoint();
+
         boolean hovering =
                 a.activeTab() == OverlayInputAccess.MainTab.RULES
-                        && a.rulesLayout().taskerFaqLinkBounds.contains(e.getPoint());
+                        && (
+                        a.rulesLayout().taskerFaqLinkBounds.contains(p)
+                                || a.rulesLayout().reloadButtonBounds.contains(p)
+                );
 
-        if (hovering && !handCursorActive) {
+        if (hovering && !handCursorActive)
+        {
             a.client().getCanvas().setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             handCursorActive = true;
-        } else if (!hovering && handCursorActive) {
+        }
+        else if (!hovering && handCursorActive)
+        {
             a.client().getCanvas().setCursor(Cursor.getDefaultCursor());
             handCursorActive = false;
         }
 
         return e;
     }
+
 
 
     @Override
@@ -358,7 +457,6 @@ public final class OverlayMouseHandler extends MouseAdapter {
         q.tierScope = next;
         return true;
     }
-
 
     // =========================
     // Sort + auto-clean helpers

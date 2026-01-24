@@ -47,5 +47,8 @@ public final class UiPalette
     public final Color PILL_ON_BG = new Color(78, 62, 38, 240);
     public final Color PILL_OFF_BG = new Color(32, 26, 17, 235);
 
+    public static final Color TIER_COMPLETE_GLOW =
+            new Color(120, 200, 140);
+
     private UiPalette() {}
 }

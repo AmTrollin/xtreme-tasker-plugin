@@ -25,6 +25,4 @@ public class TaskControlsLayout
     public String hoverTooltipText = null;
     public final Rectangle hoverTooltipAnchor = new Rectangle(); // optional
 
-
-
 }

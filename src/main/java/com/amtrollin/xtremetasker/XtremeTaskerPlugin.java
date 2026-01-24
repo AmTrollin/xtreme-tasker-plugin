@@ -374,15 +374,23 @@ public class XtremeTaskerPlugin extends Plugin {
     public int getTierPercent(TaskTier tier) {
         int total = getTierTotal(tier);
         if (total <= 0) return 0;
-        return (int) Math.round((getTierDone(tier) * 100.0) / total);
+
+        int done = getTierDone(tier);
+        return (int) ((done * 100L) / total); // integer division = floor
     }
+
 
     public String getTierProgressLabel(TaskTier tier) {
         int total = getTierTotal(tier);
         int done = getTierDone(tier);
-        int pct = (total <= 0) ? 0 : (int) Math.round((done * 100.0) / total);
+
+        int pct = (total <= 0)
+                ? 0
+                : (int) ((done * 100L) / total); // integer division = floor
+
         return done + "/" + total + " (" + pct + "%)";
     }
+
 
     public TaskTier getCurrentTier() {
         for (TaskTier tier : PROGRESSION) {
@@ -642,5 +650,17 @@ public class XtremeTaskerPlugin extends Plugin {
 
         String base = (n + "|" + s + "|" + t).toLowerCase(Locale.ROOT);
         return "gen_" + Integer.toHexString(base.hashCode());
+    }
+
+    public void pushGameMessage(String msg)
+    {
+        if (msg == null || msg.trim().isEmpty())
+        {
+            return;
+        }
+
+        clientThread.invokeLater(() ->
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", msg, null)
+        );
     }
 }

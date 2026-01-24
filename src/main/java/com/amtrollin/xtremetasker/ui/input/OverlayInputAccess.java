@@ -86,4 +86,21 @@ public interface OverlayInputAccess
     List<XtremeTask> getSortedTasksForTier(TaskTier tier);
     int taskRowBlock();
 
+    Rectangle taskDetailsViewportBounds();
+    int taskDetailsTotalContentRows();
+    int taskDetailsRowBlock();
+    TaskListScrollController taskDetailsScroll();
+
+
+    Map<XtremeTask, Rectangle> taskCheckboxBounds();
+    boolean isTaskDetailsOpen();
+    void openTaskDetails(XtremeTask task);
+    void closeTaskDetails();
+    XtremeTask taskDetailsTask();
+
+    Rectangle taskDetailsBounds();
+    Rectangle taskDetailsCloseBounds();
+    Rectangle taskDetailsWikiBounds();
+    Rectangle taskDetailsToggleBounds();
+
 }

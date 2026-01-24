@@ -91,18 +91,7 @@ public final class TaskListFilter
 
     private static boolean isCombatAchievementTask(XtremeTask t)
     {
-        // Example implementations — pick ONE that matches your codebase:
 
-        // If you have an enum/source field:
-        // return t.getSource() == TaskSource.COMBAT_ACHIEVEMENT;
-
-        // If you store a string source:
-        // return "COMBAT_ACHIEVEMENT".equalsIgnoreCase(t.getSource());
-
-        // If you infer from tier/fields:
-        // return t.getCombatAchievementTier() != null;
-
-        // TEMP fallback: try best-effort inference from existing fields
         String src = safeLower(String.valueOf(t.getSource()));
         if (!src.isEmpty())
         {
@@ -114,15 +103,7 @@ public final class TaskListFilter
 
     private static boolean isCollectionLogTask(XtremeTask t)
     {
-        // Example implementations — pick ONE that matches your codebase:
 
-        // If you have an enum/source field:
-        // return t.getSource() == TaskSource.COLLECTION_LOG;
-
-        // If you store a string source:
-        // return "COLLECTION_LOG".equalsIgnoreCase(t.getSource());
-
-        // TEMP fallback: try best-effort inference from existing fields
         String src = safeLower(String.valueOf(t.getSource()));
         if (!src.isEmpty())
         {

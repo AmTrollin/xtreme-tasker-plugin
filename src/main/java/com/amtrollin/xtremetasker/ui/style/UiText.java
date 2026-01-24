@@ -17,7 +17,7 @@ public final class UiText
     // Main tabs
     public static final String TAB_CURRENT = "Current";
     public static final String TAB_TASKS = "Tasks";
-    public static final String TAB_RULES = "Rules";
+    public static final String TAB_RULES = "Help";
 
     // Current tab
     public static final String BTN_COMPLETED = "Completed";

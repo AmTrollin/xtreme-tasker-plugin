@@ -24,11 +24,41 @@ public final class OverlayWheelHandler implements MouseWheelListener
         e.consume();
         Point p = e.getPoint();
 
+        double precise = e.getPreciseWheelRotation();
+        if (precise == 0.0)
+        {
+            return e;
+        }
+
+        // ------------------------------------------
+        // DETAILS POPUP scroll (highest priority)
+        // ------------------------------------------
+        // Requires the popup hooks on OverlayInputAccess (see below).
+        if (a.isTaskDetailsOpen() && a.taskDetailsViewportBounds().contains(p))
+        {
+            if (a.taskDetailsViewportBounds().height <= 0)
+            {
+                return e;
+            }
+
+            int total = a.taskDetailsTotalContentRows();
+            a.taskDetailsScroll().onWheel(
+                    precise,
+                    a.taskDetailsViewportBounds().height,
+                    a.taskDetailsRowBlock(),
+                    total <= 0 ? 1 : total,
+                    null
+            );
+
+            return e;
+        }
+
+
         // TASKS scroll
         if (a.activeTab() == OverlayInputAccess.MainTab.TASKS && a.taskListViewportBounds().contains(p))
         {
-            double precise = e.getPreciseWheelRotation();
-            if (precise == 0.0 || a.taskListViewportBounds().height <= 0)
+            Rectangle vp = a.taskListViewportBounds();
+            if (vp.height <= 0)
             {
                 return e;
             }
@@ -38,7 +68,7 @@ public final class OverlayWheelHandler implements MouseWheelListener
 
             a.taskListView().onWheel(
                     precise,
-                    a.taskListViewportBounds().height,
+                    vp.height,
                     a.tasksRowBlock(),
                     total
             );
@@ -49,8 +79,8 @@ public final class OverlayWheelHandler implements MouseWheelListener
         // RULES scroll
         if (a.activeTab() == OverlayInputAccess.MainTab.RULES && a.rulesViewportBounds().contains(p))
         {
-            double precise = e.getPreciseWheelRotation();
-            if (precise == 0.0 || a.rulesViewportBounds().height <= 0)
+            Rectangle vp = a.rulesViewportBounds();
+            if (vp.height <= 0)
             {
                 return e;
             }
@@ -58,7 +88,7 @@ public final class OverlayWheelHandler implements MouseWheelListener
             int total = a.rulesLayout().totalContentRows;
             a.rulesScroll().onWheel(
                     precise,
-                    a.rulesViewportBounds().height,
+                    vp.height,
                     a.rulesRowBlock(),
                     total <= 0 ? 1 : total,
                     null

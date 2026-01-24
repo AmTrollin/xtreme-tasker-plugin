@@ -6,8 +6,7 @@ import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class RulesTabRenderer
-{
+public final class RulesTabRenderer {
     private final int panelWidth;
     private final int panelPadding;
     private final int rowHeight;
@@ -19,8 +18,12 @@ public final class RulesTabRenderer
     private static final String TASKER_FAQ_URL =
             "https://docs.google.com/document/d/e/2PACX-1vTHfXHzMQFbt_iYAP-O88uRhhz3wigh1KMiiuomU7ftli-rL_c3bRqfGYmUliE1EHcIr3LfMx2UTf2U/pub";
 
-    private static final String LINE_TASKER_FAQ = "TaskerFAQ";
+    private static final String LINE_TASKER_FAQ_BUTTON = "[TASKER_FAQ_BUTTON]";
     private static final String LINE_BUTTON_ROW = "[BUTTON_ROW]";
+
+    private static final String LINE_DATA_SYNC_TITLE = "[DATA_SYNC_TITLE]";
+    private static final String LINE_DATA_SYNC_DESC = "[DATA_SYNC_DESC]";
+
 
     public RulesTabRenderer(
             int panelWidth,
@@ -29,8 +32,7 @@ public final class RulesTabRenderer
             int listRowSpacing,
             Color uiGold,
             Color uiTextDim
-    )
-    {
+    ) {
         this.panelWidth = panelWidth;
         this.panelPadding = panelPadding;
         this.rowHeight = rowHeight;
@@ -39,8 +41,7 @@ public final class RulesTabRenderer
         this.uiTextDim = uiTextDim;
     }
 
-    public int rowBlock()
-    {
+    public int rowBlock() {
         return rowHeight + listRowSpacing;
     }
 
@@ -51,8 +52,7 @@ public final class RulesTabRenderer
             int cursorYBaseline,
             Rectangle panelBounds,
             int scrollOffsetRows
-    )
-    {
+    ) {
         RulesTabLayout layout = new RulesTabLayout();
         layout.taskerFaqLinkBounds.setBounds(0, 0, 0, 0);
 
@@ -80,25 +80,76 @@ public final class RulesTabRenderer
 
         int drawY = cursorYBaseline;
 
-        for (int idx = start; idx < end; idx++)
-        {
+        for (int idx = start; idx < end; idx++) {
             String line = lines.get(idx);
 
-            if (LINE_BUTTON_ROW.equals(line))
-            {
-                int btnW = viewportW - 8;
+            if (LINE_BUTTON_ROW.equals(line)) {
+                int btnW = viewportW / 3;
                 int btnH = rowHeight + 10;
 
-                int by = (drawY - fm.getAscent());
-                layout.reloadButtonBounds.setBounds(bx, by, btnW, btnH);
+// center within viewport
+                int btnX = bx + (viewportW - btnW) / 2;
+                int by = drawY - fm.getAscent();
+
+                layout.reloadButtonBounds.setBounds(btnX, by, btnW, btnH);
+
 
                 // Overlay draws the button using its drawButton helper
                 drawY += rb;
                 continue;
             }
 
-            if (line.trim().isEmpty())
-            {
+            if (LINE_TASKER_FAQ_BUTTON.equals(line)) {
+                int btnW = viewportW / 3;
+                int btnH = rowHeight + 10;
+
+// center within viewport
+                int btnX = bx + (viewportW - btnW) / 2;
+                int by = drawY - fm.getAscent();
+
+                layout.taskerFaqLinkBounds.setBounds(btnX, by, btnW, btnH);
+
+
+                // Overlay will draw bevel button + handle click
+                drawY += rb;
+                continue;
+            }
+
+            if (LINE_DATA_SYNC_TITLE.equals(line)) {
+                g.setColor(uiGold);
+
+                String title = "Data Sync";
+                int w = fm.stringWidth(title);
+                int cx = bx + (viewportW - w) / 2;
+
+                g.drawString(title, cx, drawY);
+
+                // subtle underline
+                g.drawLine(cx, drawY + 1, cx + w, drawY + 1);
+
+                drawY += rb;
+                continue;
+            }
+
+            if (LINE_DATA_SYNC_DESC.equals(line)) {
+                g.setColor(uiTextDim);
+
+                List<String> descLines = wrapText(
+                        "Pull in any new tasks you may not have since your last sync. Your current progress will not be lost.",
+                        fm,
+                        viewportW - 8
+                );
+
+                for (String l : descLines) {
+                    g.drawString(l, bx, drawY);
+                    drawY += rb;
+                }
+
+                continue;
+            }
+
+
+            if (line.trim().isEmpty()) {
                 drawY += rb;
                 continue;
             }
@@ -108,22 +159,17 @@ public final class RulesTabRenderer
                             || line.equals("Boss combat training allowance")
                             || line.equals("Official Tasker rules");
 
-            boolean isTaskerFaqLink = LINE_TASKER_FAQ.equals(line);
 
             // color
-            if (isTitle || isTaskerFaqLink)
-            {
+            if (isTitle) {
                 g.setColor(uiGold);
-            }
-            else
-            {
+            } else {
                 g.setColor(uiTextDim);
             }
 
             String drawText = XtremeTaskerOverlay.getString(line, fm, viewportW - 8);
 
-            if (line.equals("Rules"))
-            {
+            if (line.equals("Rules")) {
                 int textW = fm.stringWidth(drawText);
                 int centerX = bx + (viewportW - textW) / 2;
 
@@ -131,25 +177,7 @@ public final class RulesTabRenderer
 
                 int underlineY = drawY + 1;
                 g.drawLine(centerX, underlineY, centerX + textW, underlineY);
-            }
-            else if (isTaskerFaqLink)
-            {
-                // Draw like a link + store bounds for click handling
-                g.drawString(drawText, bx, drawY);
-
-                int w = fm.stringWidth(drawText);
-                int underlineY = drawY + 1;
-                g.drawLine(bx, underlineY, bx + w, underlineY);
-
-                layout.taskerFaqLinkBounds.setBounds(
-                        bx,
-                        drawY - fm.getAscent(),
-                        w,
-                        fm.getHeight()
-                );
-            }
-            else
-            {
+            } else {
                 g.drawString(drawText, bx, drawY);
             }
 
@@ -160,9 +188,9 @@ public final class RulesTabRenderer
         return layout;
     }
 
-    private List<String> buildLines(FontMetrics fm, int maxWidth)
-    {
+    private List<String> buildLines(FontMetrics fm, int maxWidth) {
         List<String> lines = new ArrayList<>();
+        lines.add("");
         lines.add("Rules");
         lines.add("");
 
@@ -189,28 +217,30 @@ public final class RulesTabRenderer
                 maxWidth
         ));
         lines.add("");
-        lines.add(LINE_TASKER_FAQ);
+        lines.add(LINE_TASKER_FAQ_BUTTON);
         lines.add("");
+        lines.add("");
+        lines.add(LINE_DATA_SYNC_TITLE);
+        lines.add("");
+        lines.add(LINE_DATA_SYNC_DESC);
         lines.add("");
         lines.add(LINE_BUTTON_ROW);
         lines.add("");
 
+
         return lines;
     }
 
-    private List<String> wrapText(String text, FontMetrics fm, int maxWidth)
-    {
+    private List<String> wrapText(String text, FontMetrics fm, int maxWidth) {
         List<String> lines = new ArrayList<>();
         if (text == null) return lines;
 
         String cleaned = text.trim().replace("\r", "");
         if (cleaned.isEmpty()) return lines;
 
-        for (String paragraph : cleaned.split("\n"))
-        {
+        for (String paragraph : cleaned.split("\n")) {
             String p = paragraph.trim();
-            if (p.isEmpty())
-            {
+            if (p.isEmpty()) {
                 lines.add("");
                 continue;
             }
@@ -218,31 +248,23 @@ public final class RulesTabRenderer
             String[] words = p.split("\\s+");
             StringBuilder line = new StringBuilder();
 
-            for (String w : words)
-            {
+            for (String w : words) {
                 String candidate = (line.length() == 0) ? w : (line + " " + w);
-                if (fm.stringWidth(candidate) <= maxWidth)
-                {
+                if (fm.stringWidth(candidate) <= maxWidth) {
                     line.setLength(0);
                     line.append(candidate);
-                }
-                else
-                {
-                    if (line.length() > 0)
-                    {
+                } else {
+                    if (line.length() > 0) {
                         lines.add(line.toString());
                         line.setLength(0);
                         line.append(w);
-                    }
-                    else
-                    {
+                    } else {
                         lines.add(XtremeTaskerOverlay.getString(w, fm, maxWidth));
                     }
                 }
             }
 
-            if (line.length() > 0)
-            {
+            if (line.length() > 0) {
                 lines.add(line.toString());
             }
         }
@@ -250,14 +272,12 @@ public final class RulesTabRenderer
         return lines;
     }
 
-    private static int clamp(int v, int max)
-    {
+    private static int clamp(int v, int max) {
         return Math.max(0, Math.min(max, v));
     }
 
     // Expose URL so overlay can use it for clicks without duplicating string
-    public static String taskerFaqUrl()
-    {
+    public static String taskerFaqUrl() {
         return TASKER_FAQ_URL;
     }
 }
