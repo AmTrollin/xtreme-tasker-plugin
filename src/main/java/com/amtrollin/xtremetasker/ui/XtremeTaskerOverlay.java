@@ -3,6 +3,7 @@
 package com.amtrollin.xtremetasker.ui;
 
 import com.amtrollin.xtremetasker.TaskerService;
+import com.amtrollin.xtremetasker.XtremeTaskerPlugin;
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
@@ -30,6 +31,7 @@ import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsRenderer;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskSelectionModel;
 import com.amtrollin.xtremetasker.ui.style.UiPalette;
 import com.amtrollin.xtremetasker.ui.text.TextUtils;
+import com.amtrollin.xtremetasker.ui.widgets.ButtonRenderer;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -167,6 +169,7 @@ public class XtremeTaskerOverlay extends Overlay {
             taskCheckboxBounds,
             taskListViewportBounds
     );
+    private final ButtonRenderer buttonRenderer = new ButtonRenderer(P);
 
 
     @Inject
@@ -288,9 +291,9 @@ public class XtremeTaskerOverlay extends Overlay {
         tasksTabBounds.setBounds(tab2X, cursorY, tabW, tabH);
         rulesTabBounds.setBounds(tab3X, cursorY, tabW, tabH);
 
-        drawTab(g, currentTabBounds, "Current", activeTab == MainTab.CURRENT);
-        drawTab(g, tasksTabBounds, "Tasks", activeTab == MainTab.TASKS);
-        drawTab(g, rulesTabBounds, "Help", activeTab == MainTab.RULES);
+        buttonRenderer.drawTab(g, currentTabBounds, "Current", activeTab == MainTab.CURRENT);
+        buttonRenderer.drawTab(g, tasksTabBounds, "Tasks", activeTab == MainTab.TASKS);
+        buttonRenderer.drawTab(g, rulesTabBounds, "Help", activeTab == MainTab.RULES);
 
         cursorY += tabH + 10;
 
@@ -391,10 +394,10 @@ public class XtremeTaskerOverlay extends Overlay {
         rulesViewportBounds.setBounds(layout.viewportBounds);
 
         if (rulesLayout.reloadButtonBounds.width > 0) {
-            drawButton(g, rulesLayout.reloadButtonBounds, "Reload tasks list", true);
+            buttonRenderer.drawButton(g, rulesLayout.reloadButtonBounds, "Reload tasks list", true);
         }
         if (rulesLayout.syncProgressButtonBounds.width > 0) {
-            drawButton(g, rulesLayout.syncProgressButtonBounds, "Sync In Game Progress", false); // disabled placeholder
+            buttonRenderer.drawButton(g, rulesLayout.syncProgressButtonBounds, "Sync In Game Progress", false); // disabled placeholder
         }
 
         // Hover tooltip for disabled "Sync In Game Progress"
@@ -416,7 +419,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
         if (rulesLayout.taskerFaqLinkBounds.width > 0)
         {
-            drawButton(g, rulesLayout.taskerFaqLinkBounds, "TaskerFAQ", true);
+            buttonRenderer.drawButton(g, rulesLayout.taskerFaqLinkBounds, "TaskerFAQ", true);
         }
 
         int rb = rulesTabRenderer.rowBlock();
@@ -1035,62 +1038,8 @@ public class XtremeTaskerOverlay extends Overlay {
         };
     }
 
-    private void drawTab(Graphics2D g, Rectangle bounds, String text, boolean active) {
-        Color bg = active ? P.TAB_ACTIVE_BG : P.TAB_INACTIVE_BG;
-        drawBevelBox(g, bounds, bg);
-
-        if (active) {
-            g.setColor(P.UI_GOLD);
-            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        }
-
-        g.setColor(active ? P.UI_TEXT : P.UI_TEXT_DIM);
-
-        FontMetrics fm = g.getFontMetrics();
-        String drawText = TextUtils.truncateToWidth(text, fm, bounds.width - 8);
-        int tw = fm.stringWidth(drawText);
-
-        int tx = bounds.x + (bounds.width - tw) / 2;
-        int ty = centeredTextBaseline(bounds, fm);
-
-        g.drawString(drawText, tx, ty);
-    }
-
-    private void drawButton(Graphics2D g, Rectangle bounds, String text, boolean enabled) {
-        Color bg = enabled ? P.BTN_ENABLED_BG : P.BTN_DISABLED_BG;
-        drawBevelBox(g, bounds, bg);
-
-        if (enabled) {
-            g.setColor(P.UI_GOLD);
-            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        }
-
-        g.setColor(enabled ? P.UI_TEXT : new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 130));
-
-        FontMetrics fm = g.getFontMetrics();
-        String drawText = TextUtils.truncateToWidth(text, fm, bounds.width - 10);
-        int tw = fm.stringWidth(drawText);
-
-        int tx = bounds.x + (bounds.width - tw) / 2;
-        int ty = centeredTextBaseline(bounds, fm);
-
-        g.drawString(drawText, tx, ty);
-    }
-
     private void drawBevelBox(Graphics2D g, Rectangle r, Color fill) {
-        g.setColor(fill);
-        g.fillRect(r.x, r.y, r.width, r.height);
-
-        g.setColor(P.UI_EDGE_DARK);
-        g.drawRect(r.x, r.y, r.width, r.height);
-
-        g.setColor(P.UI_EDGE_LIGHT);
-        g.drawLine(r.x + 1, r.y + 1, r.x + r.width - 2, r.y + 1);
-        g.drawLine(r.x + 1, r.y + 1, r.x + 1, r.y + r.height - 2);
-
-        g.setColor(P.UI_EDGE_DARK);
-        g.drawLine(r.x + 1, r.y + r.height - 2, r.x + r.width - 2, r.y + r.height - 2);
-        g.drawLine(r.x + r.width - 2, r.y + 1, r.x + r.width - 2, r.y + r.height - 2);
+        buttonRenderer.drawBevelBox(g, r, fill);
     }
 
     private int centeredTextBaseline(Rectangle bounds, FontMetrics fm) {
