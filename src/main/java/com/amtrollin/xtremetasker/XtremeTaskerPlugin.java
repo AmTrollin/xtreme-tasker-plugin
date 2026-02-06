@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
         description = "Progressive random task generator using Combat Achievements and collection log entries, with completion tracking.",
         tags = {"tasks", "combat achievements", "collection log"}
 )
-public class XtremeTaskerPlugin extends Plugin {
+public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     private static final String CONFIG_GROUP = "xtremetasker";
     private static final String STATE_KEY_PREFIX = "state_";
 

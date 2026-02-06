@@ -9,7 +9,7 @@ import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
 
-import static com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay.getString;
+import static com.amtrollin.xtremetasker.ui.text.TextUtils.truncateToWidth;
 
 /**
  * Goals this version satisfies:
@@ -479,11 +479,6 @@ public class TaskControlsRenderer
     private int centeredTextBaseline(Rectangle bounds, FontMetrics fm)
     {
         return bounds.y + ((bounds.height - fm.getHeight()) / 2) + fm.getAscent();
-    }
-
-    private String truncateToWidth(String text, FontMetrics fm, int maxWidth)
-    {
-        return getString(text, fm, maxWidth);
     }
 
     private Color withAlpha(Color c, int a)

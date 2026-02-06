@@ -2,13 +2,13 @@ package com.amtrollin.xtremetasker.ui.tasklist;
 
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
-import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
+import com.amtrollin.xtremetasker.ui.text.TaskLabelFormatter;
+import com.amtrollin.xtremetasker.ui.text.TextUtils;
 
 import java.awt.*;
 import java.util.List;
 import java.util.function.Function;
 
-import static com.amtrollin.xtremetasker.enums.TaskTier.*;
 import static com.amtrollin.xtremetasker.tasklist.TaskListPipeline.safe;
 
 public final class TaskRowsRenderer {
@@ -95,17 +95,7 @@ public final class TaskRowsRenderer {
 
     private static String prettyTier(TaskTier t)
     {
-        if (t == null) return "";
-        switch (t)
-        {
-            case EASY: return "Easy";
-            case MEDIUM: return "Medium";
-            case HARD: return "Hard";
-            case ELITE: return "Elite";
-            case MASTER: return "Master";
-            case GRANDMASTER: return "Grandmaster";
-            default: return t.name();
-        }
+        return TaskLabelFormatter.tierLabel(t);
     }
 
     /**
@@ -221,7 +211,7 @@ public final class TaskRowsRenderer {
             int textMaxW = Math.max(0, viewportW - taskTextPadLeft - 10);
 
             assert task != null;
-            String taskName = XtremeTaskerOverlay.getString(safe(task.getName()), fm, textMaxW);
+            String taskName = TextUtils.truncateToWidth(safe(task.getName()), fm, textMaxW);
 
             if (showTierPrefix)
             {

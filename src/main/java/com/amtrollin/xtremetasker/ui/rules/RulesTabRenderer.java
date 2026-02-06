@@ -1,6 +1,6 @@
 package com.amtrollin.xtremetasker.ui.rules;
 
-import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
+import com.amtrollin.xtremetasker.ui.text.TextUtils;
 import net.runelite.client.ui.FontManager;
 
 import java.awt.*;
@@ -217,7 +217,7 @@ public final class RulesTabRenderer
             g.setFont(normalFont);
             fm = g.getFontMetrics();
 
-            String drawText = XtremeTaskerOverlay.getString(line, fm, viewportW - 8);
+            String drawText = TextUtils.truncateToWidth(line, fm, viewportW - 8);
             g.drawString(drawText, bx, drawY);
 
             drawY += rb;
@@ -236,7 +236,7 @@ public final class RulesTabRenderer
         lines.add("");
 
         lines.add("Boss combat training allowance");
-        lines.addAll(wrapText(
+        lines.addAll(TextUtils.wrapText(
                 "For any task requiring that you kill a boss with a suggested skills section on their "
                         + "\"strategies\" OSRS wiki page, you are allowed to train your combat skills to those "
                         + "suggested skills. You must do this through the Slayer skill, with any slayer master(s) "
@@ -251,7 +251,7 @@ public final class RulesTabRenderer
         lines.add("");
 
         lines.add("Official Tasker rules");
-        lines.addAll(wrapText(
+        lines.addAll(TextUtils.wrapText(
                 "Follow all current official Tasker rules, as written in the TaskerFAQ linked below. "
                         + "Refer to the Rules and Overview section for all tasks, including combat achievements.",
                 fm,
@@ -271,70 +271,18 @@ public final class RulesTabRenderer
                 "Refresh your task list with the latest official Tasker definitions " +
                         "and pull in any new tasks added to the game since your last sync. "
                         + "Your current tasks and progress will be preserved.";
-        lines.addAll(wrapText(reloadDesc, fm, maxWidth));
+        lines.addAll(TextUtils.wrapText(reloadDesc, fm, maxWidth));
         lines.add("");
         lines.add("Syncing account progress [COMING SOON!]");
 // Description for Sync In-Game Progress (coming soon)
         String progressDesc =
                 "Detect and mark completed tasks based on your existing in-game achievements.";
-        lines.addAll(wrapText(progressDesc, fm, maxWidth));
+        lines.addAll(TextUtils.wrapText(progressDesc, fm, maxWidth));
         lines.add("");
 
         lines.add(LINE_DATA_SYNC_BUTTON_ROW);
         lines.add("");
 
-
-        return lines;
-    }
-
-    private List<String> wrapText(String text, FontMetrics fm, int maxWidth)
-    {
-        List<String> lines = new ArrayList<>();
-        if (text == null) return lines;
-
-        String cleaned = text.trim().replace("\r", "");
-        if (cleaned.isEmpty()) return lines;
-
-        for (String paragraph : cleaned.split("\n"))
-        {
-            String p = paragraph.trim();
-            if (p.isEmpty())
-            {
-                lines.add("");
-                continue;
-            }
-
-            String[] words = p.split("\\s+");
-            StringBuilder line = new StringBuilder();
-
-            for (String w : words)
-            {
-                String candidate = (line.length() == 0) ? w : (line + " " + w);
-                if (fm.stringWidth(candidate) <= maxWidth)
-                {
-                    line.setLength(0);
-                    line.append(candidate);
-                }
-                else
-                {
-                    if (line.length() > 0)
-                    {
-                        lines.add(line.toString());
-                        line.setLength(0);
-                        line.append(w);
-                    }
-                    else
-                    {
-                        lines.add(XtremeTaskerOverlay.getString(w, fm, maxWidth));
-                    }
-                }
-            }
-
-            if (line.length() > 0)
-            {
-                lines.add(line.toString());
-            }
-        }
 
         return lines;
     }

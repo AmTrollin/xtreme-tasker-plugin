@@ -2,6 +2,7 @@
 
 package com.amtrollin.xtremetasker.ui;
 
+import com.amtrollin.xtremetasker.TaskerService;
 import com.amtrollin.xtremetasker.XtremeTaskerPlugin;
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
@@ -10,6 +11,7 @@ import com.amtrollin.xtremetasker.tasklist.TaskListPipeline;
 import com.amtrollin.xtremetasker.tasklist.models.TaskListQuery;
 import com.amtrollin.xtremetasker.ui.anim.OverlayAnimations;
 import com.amtrollin.xtremetasker.ui.tasks.TaskControlsRenderer;
+import com.amtrollin.xtremetasker.ui.tasks.TaskDetailsPopup;
 import com.amtrollin.xtremetasker.ui.tasks.models.TaskControlsLayout;
 import com.amtrollin.xtremetasker.ui.current.CurrentTabLayout;
 import com.amtrollin.xtremetasker.ui.current.CurrentTabRenderer;
@@ -25,6 +27,8 @@ import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsLayout;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsRenderer;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskSelectionModel;
 import com.amtrollin.xtremetasker.ui.style.UiPalette;
+import com.amtrollin.xtremetasker.ui.text.TaskLabelFormatter;
+import com.amtrollin.xtremetasker.ui.text.TextUtils;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -86,7 +90,6 @@ public class XtremeTaskerOverlay extends Overlay {
     private final RulesTabLayout rulesLayout = new RulesTabLayout();
 
     private boolean panelOpen = false;
-    private XtremeTask detailsTask = null;
     private boolean draggingPanel = false;
     private int dragOffsetX = 0;
     private int dragOffsetY = 0;
@@ -103,7 +106,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
     // ---- client/plugin ----
     private final Client client;
-    private final XtremeTaskerPlugin plugin;
+    private final TaskerService plugin;
 
     @Getter
     private final MouseAdapter mouseAdapter;
@@ -120,17 +123,9 @@ public class XtremeTaskerOverlay extends Overlay {
     private TaskTier activeTierTab = TaskTier.EASY;
     private final Map<XtremeTask, Rectangle> taskCheckboxBounds = new HashMap<>();
 
-    // -----------------------------
-// Task Details popup state
-// -----------------------------
-    private final Rectangle detailsBounds = new Rectangle();
-    private final Rectangle detailsViewportBounds = new Rectangle();
-    private final Rectangle detailsCloseBounds = new Rectangle();
-    private final Rectangle detailsWikiBounds = new Rectangle();
-    private final Rectangle detailsToggleBounds = new Rectangle();
-
-    private int detailsTotalContentRows = 0;
-    private final TaskListScrollController detailsScroll = new TaskListScrollController(SCROLL_ROWS_PER_NOTCH);
+    // Task Details popup
+    private final TaskDetailsPopup taskDetailsPopup =
+            new TaskDetailsPopup(P, new TaskListScrollController(SCROLL_ROWS_PER_NOTCH));
 
 
     // ==========================
@@ -335,7 +330,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
         g.setColor(new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 160));
         String hint = "Keys: R - roll, C - complete, W - wiki";
-        g.drawString(getString(hint, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, currentLayout.rollButtonBounds.y + currentLayout.rollButtonBounds.height + ROW_HEIGHT);
+        g.drawString(TextUtils.truncateToWidth(hint, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, currentLayout.rollButtonBounds.y + currentLayout.rollButtonBounds.height + ROW_HEIGHT);
     }
 
     private void renderTasksTab(Graphics2D g, FontMetrics fm, int panelX, int cursorYBaseline) {
@@ -406,7 +401,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
         String progress = prettyTier(activeTierTab) + " progress: " + plugin.getTierProgressLabel(activeTierTab);
         g.setColor(P.UI_TEXT);
-        g.drawString(getString(progress, pfm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, cursorYBaseline);
+        g.drawString(TextUtils.truncateToWidth(progress, pfm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, cursorYBaseline);
 
         // Restore font + advance cursor with better padding
         g.setFont(oldFont);
@@ -426,7 +421,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
         String taskHint = "Task list: click circle to toggle status, click row for details";
         g.drawString(
-                getString(taskHint, fm, panelInnerTextMaxWidth()),
+                TextUtils.truncateToWidth(taskHint, fm, panelInnerTextMaxWidth()),
                 panelX + PANEL_PADDING,
                 cursorYBaseline + hintVisualOffset
         );
@@ -473,7 +468,7 @@ public class XtremeTaskerOverlay extends Overlay {
             g.setColor(P.UI_TEXT_DIM);
             String msg = hasActiveConstraints(taskQuery) ? "No matches." : "No tasks.";
             int textY = emptyViewport.y + Math.max(ROW_HEIGHT, emptyViewport.height / 3);
-            g.drawString(getString(msg, fm, emptyViewport.width), emptyViewport.x, textY);
+            g.drawString(TextUtils.truncateToWidth(msg, fm, emptyViewport.width), emptyViewport.x, textY);
 
             displayTaskTierNavHints(g, fm, panelX, hintBaselineY, navLineH);
 
@@ -552,8 +547,14 @@ public class XtremeTaskerOverlay extends Overlay {
         displayTaskTierNavHints(g, fm, panelX, hintBaselineY, navLineH);
 
         // Render details popup on top of everything
-        if (detailsTask != null) {
-            renderTaskDetailsPopup(g, fm);
+        if (taskDetailsPopup.isOpen()) {
+            taskDetailsPopup.render(
+                    g,
+                    fm,
+                    panelBounds,
+                    plugin::isTaskCompleted,
+                    client.getMouseCanvasPosition()
+            );
         }
 
     }
@@ -563,9 +564,9 @@ public class XtremeTaskerOverlay extends Overlay {
         String navHint1 = "[Keys] Tasks: Space/Enter - toggle status, Up/Down - scroll, Left/Right - switch tier tab";
         String navHint2 = "Filters: 1/2/3 - source, Q/W/E - status, A - tier scope | Sorts: S/T/R";
 
-        g.drawString(getString(navHint1, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, hintBaselineY - navLineH);
+        g.drawString(TextUtils.truncateToWidth(navHint1, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, hintBaselineY - navLineH);
 
-        g.drawString(getString(navHint2, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, hintBaselineY);
+        g.drawString(TextUtils.truncateToWidth(navHint2, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, hintBaselineY);
     }
 
 
@@ -627,12 +628,12 @@ public class XtremeTaskerOverlay extends Overlay {
 
         if (!animations.isRolling()) {
             if (current == null) {
-                return getString("Click \"Roll task\" to get a task", fm, maxW);
+                return TextUtils.truncateToWidth("Click \"Roll task\" to get a task", fm, maxW);
             }
 
             String tierTag = " [" + current.getTier().name() + "]";
             String line = (currentCompleted ? "[Marked completed in task tab] " : "Current: ") + current.getName() + tierTag;
-            return getString(line, fm, maxW);
+            return TextUtils.truncateToWidth(line, fm, maxW);
         }
 
         TaskTier tier = (current != null) ? current.getTier() : plugin.getCurrentTier();
@@ -640,7 +641,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
         List<XtremeTask> pool = getTasksForTier(tier);
         if (pool.isEmpty()) {
-            return getString("Rolling...", fm, maxW);
+            return TextUtils.truncateToWidth("Rolling...", fm, maxW);
         }
 
         long elapsed = animations.rollElapsedMs();
@@ -653,7 +654,7 @@ public class XtremeTaskerOverlay extends Overlay {
         String name = pool.get(idx).getName();
         if (name == null || name.trim().isEmpty()) name = "Rolling...";
 
-        return getString("Rolling: " + name + " [" + tier.name() + "]", fm, maxW);
+        return TextUtils.truncateToWidth("Rolling: " + name + " [" + tier.name() + "]", fm, maxW);
     }
 
 
@@ -778,8 +779,8 @@ public class XtremeTaskerOverlay extends Overlay {
             return true;
         }
 
-        if (e.getKeyCode() == KeyEvent.VK_ESCAPE && detailsTask != null) {
-            closeTaskDetails();
+        if (e.getKeyCode() == KeyEvent.VK_ESCAPE && taskDetailsPopup.isOpen()) {
+            taskDetailsPopup.close();
             return true;
         }
 
@@ -865,8 +866,8 @@ public class XtremeTaskerOverlay extends Overlay {
             }
         }
 
-        if (e.getKeyCode() == KeyEvent.VK_ESCAPE && detailsTask != null) {
-            closeTaskDetails();
+        if (e.getKeyCode() == KeyEvent.VK_ESCAPE && taskDetailsPopup.isOpen()) {
+            taskDetailsPopup.close();
             return true;
         }
 
@@ -1164,43 +1165,39 @@ public class XtremeTaskerOverlay extends Overlay {
                 return XtremeTaskerOverlay.this.rulesRowBlock();
             }
 
-            // -----------------------------
-            // Task Details popup stubs (until popup is implemented)
-            // -----------------------------
-
             @Override
             public boolean isTaskDetailsOpen() {
-                return detailsTask != null;
+                return taskDetailsPopup.isOpen();
             }
 
             @Override
             public void openTaskDetails(XtremeTask task) {
-                XtremeTaskerOverlay.this.openTaskDetails(task);
+                taskDetailsPopup.open(task);
             }
 
             @Override
             public void closeTaskDetails() {
-                XtremeTaskerOverlay.this.closeTaskDetails();
+                taskDetailsPopup.close();
             }
 
             @Override
             public XtremeTask taskDetailsTask() {
-                return detailsTask;
+                return taskDetailsPopup.task();
             }
 
             @Override
             public Rectangle taskDetailsBounds() {
-                return detailsBounds;
+                return taskDetailsPopup.bounds();
             }
 
             @Override
             public Rectangle taskDetailsViewportBounds() {
-                return detailsViewportBounds;
+                return taskDetailsPopup.viewportBounds();
             }
 
             @Override
             public int taskDetailsTotalContentRows() {
-                return detailsTotalContentRows;
+                return taskDetailsPopup.totalContentRows();
             }
 
             @Override
@@ -1210,22 +1207,22 @@ public class XtremeTaskerOverlay extends Overlay {
 
             @Override
             public TaskListScrollController taskDetailsScroll() {
-                return detailsScroll;
+                return taskDetailsPopup.scroll();
             }
 
             @Override
             public Rectangle taskDetailsCloseBounds() {
-                return detailsCloseBounds;
+                return taskDetailsPopup.closeBounds();
             }
 
             @Override
             public Rectangle taskDetailsWikiBounds() {
-                return detailsWikiBounds;
+                return taskDetailsPopup.wikiBounds();
             }
 
             @Override
             public Rectangle taskDetailsToggleBounds() {
-                return detailsToggleBounds;
+                return taskDetailsPopup.toggleBounds();
             }
 
 
@@ -1234,24 +1231,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
     // --------- UI primitives (kept in overlay) ---------
     private String prettyTier(TaskTier t) {
-        return getString(t);
-    }
-
-    public static String getString(TaskTier t) {
-        switch (t) {
-            case EASY:
-                return "Easy";
-            case MEDIUM:
-                return "Medium";
-            case HARD:
-                return "Hard";
-            case ELITE:
-                return "Elite";
-            case MASTER:
-                return "Master";
-            default:
-                return t.name();
-        }
+        return TaskLabelFormatter.tierLabel(t);
     }
 
     private void drawTab(Graphics2D g, Rectangle bounds, String text, boolean active) {
@@ -1266,7 +1246,7 @@ public class XtremeTaskerOverlay extends Overlay {
         g.setColor(active ? P.UI_TEXT : P.UI_TEXT_DIM);
 
         FontMetrics fm = g.getFontMetrics();
-        String drawText = getString(text, fm, bounds.width - 8);
+        String drawText = TextUtils.truncateToWidth(text, fm, bounds.width - 8);
         int tw = fm.stringWidth(drawText);
 
         int tx = bounds.x + (bounds.width - tw) / 2;
@@ -1287,7 +1267,7 @@ public class XtremeTaskerOverlay extends Overlay {
         g.setColor(enabled ? P.UI_TEXT : new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 130));
 
         FontMetrics fm = g.getFontMetrics();
-        String drawText = getString(text, fm, bounds.width - 10);
+        String drawText = TextUtils.truncateToWidth(text, fm, bounds.width - 10);
         int tw = fm.stringWidth(drawText);
 
         int tx = bounds.x + (bounds.width - tw) / 2;
@@ -1307,13 +1287,13 @@ public class XtremeTaskerOverlay extends Overlay {
 
         FontMetrics fm = g.getFontMetrics();
 
-        String pct = getString(rightText, fm, 34);
+        String pct = TextUtils.truncateToWidth(rightText, fm, 34);
 
         int pctW = fm.stringWidth(pct);
         int pctX = bounds.x + bounds.width - 4 - pctW;
 
         int leftMaxW = Math.max(0, (pctX - (bounds.x + 4) - 4));
-        String tier = getString(leftText, fm, leftMaxW);
+        String tier = TextUtils.truncateToWidth(leftText, fm, leftMaxW);
 
         int ty = centeredTextBaseline(bounds, fm);
 
@@ -1367,25 +1347,6 @@ public class XtremeTaskerOverlay extends Overlay {
     private int centeredTextBaseline(Rectangle bounds, FontMetrics fm) {
         return bounds.y + ((bounds.height - fm.getHeight()) / 2) + fm.getAscent();
     }
-
-    public static String getString(String text, FontMetrics fm, int maxWidth) {
-        if (text == null) return "";
-        if (fm.stringWidth(text) <= maxWidth) return text;
-
-        String ellipsis = "...";
-        int ellipsisWidth = fm.stringWidth(ellipsis);
-
-        StringBuilder sb = new StringBuilder();
-        for (char c : text.toCharArray()) {
-            if (fm.stringWidth(sb.toString() + c) + ellipsisWidth > maxWidth) {
-                break;
-            }
-            sb.append(c);
-        }
-        sb.append(ellipsis);
-        return sb.toString();
-    }
-
 
     private Point computeIconPosition(int canvasWidth, int canvasHeight) {
         Widget orb = client.getWidget(WidgetInfo.MINIMAP_WORLDMAP_ORB);
@@ -1451,420 +1412,5 @@ public class XtremeTaskerOverlay extends Overlay {
         // default: only active tier
         return getTasksForTier(activeTier);
     }
-
-    // -----------------------------
-    // Popup open/close
-    // -----------------------------
-    private void openTaskDetails(XtremeTask task) {
-        if (task == null) return;
-        detailsTask = task;
-        detailsScroll.reset();
-    }
-
-    private void closeTaskDetails() {
-        detailsTask = null;
-        detailsScroll.reset();
-        detailsBounds.setBounds(0, 0, 0, 0);
-        detailsViewportBounds.setBounds(0, 0, 0, 0);
-        detailsCloseBounds.setBounds(0, 0, 0, 0);
-        detailsWikiBounds.setBounds(0, 0, 0, 0);
-        detailsToggleBounds.setBounds(0, 0, 0, 0);
-        detailsTotalContentRows = 0;
-    }
-
-    // -----------------------------
-// Task details popup renderer (no scroll)
-// -----------------------------
-    private void renderTaskDetailsPopup(Graphics2D g, FontMetrics fm) {
-        if (detailsTask == null) {
-            return;
-        }
-
-        // Dim panel behind popup
-        g.setColor(new Color(0, 0, 0, 120));
-        g.fillRect(panelBounds.x, panelBounds.y, panelBounds.width, panelBounds.height);
-
-        // Popup bounds (smaller)
-        if (detailsBounds.width <= 0 || detailsBounds.height <= 0) {
-            int w = (int) (panelBounds.width * 0.82);
-            int h = (int) (panelBounds.height * 0.70);
-            int x = panelBounds.x + (panelBounds.width - w) / 2;
-            int y = panelBounds.y + (panelBounds.height - h) / 2;
-            detailsBounds.setBounds(x, y, w, h);
-        }
-
-        // Background
-        drawBevelBox(g, detailsBounds, new Color(45, 36, 24, 245));
-
-
-// -----------------------------
-// Header row: title + (Wiki / X) — SMALL FONT
-// -----------------------------
-        final int pad = 12;
-        final int x = detailsBounds.x + pad;
-        final int yTop = detailsBounds.y + pad;
-
-// Use SMALL font everywhere in header
-        g.setFont(FontManager.getRunescapeSmallFont());
-        FontMetrics headerFm = g.getFontMetrics();
-        g.setColor(P.UI_GOLD);
-
-        String title = safe(detailsTask.getName());
-
-// Reserve space on the right for buttons (same as before)
-        final int closeW = 28;
-        final int wikiW = 60;
-        final int gap = 8;
-        final int rightReserve = closeW + gap + wikiW + gap;
-
-        int titleMaxW = Math.max(0, detailsBounds.width - (pad * 2) - rightReserve);
-        int titleBaseline = yTop + headerFm.getAscent();
-
-// Draw title (small font)
-        g.drawString(getString(title, headerFm, titleMaxW), x, titleBaseline);
-
-// Button sizing (unchanged)
-        int btnH = ROW_HEIGHT + 8;
-        int btnY = yTop - 2;
-
-        int closeX = detailsBounds.x + detailsBounds.width - pad - closeW;
-        int wikiX = closeX - gap - wikiW;
-
-        detailsCloseBounds.setBounds(closeX, btnY, closeW, btnH);
-        detailsWikiBounds.setBounds(wikiX, btnY, wikiW, btnH);
-
-// Draw wiki button (small font)
-        drawPopupButton(g, headerFm, detailsWikiBounds, "Wiki", true);
-
-// Draw close button (small font)
-        drawBevelBox(g, detailsCloseBounds, new Color(32, 26, 17, 235));
-        g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 200));
-        g.drawRect(detailsCloseBounds.x, detailsCloseBounds.y, detailsCloseBounds.width, detailsCloseBounds.height);
-
-        g.setColor(P.UI_TEXT);
-        String xLabel = "X";
-        int xw = headerFm.stringWidth(xLabel);
-        g.drawString(
-                xLabel,
-                detailsCloseBounds.x + (detailsCloseBounds.width - xw) / 2,
-                centeredTextBaseline(detailsCloseBounds, headerFm)
-        );
-
-// Divider under header (same placement as before)
-        int headerBottomY = detailsBounds.y + pad + btnH + 6;
-        g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 55));
-        g.drawLine(detailsBounds.x + pad, headerBottomY, detailsBounds.x + detailsBounds.width - pad, headerBottomY);
-
-// -----------------------------
-// Meta row: Source + Tier bevel badges (left-aligned, no labels)
-// -----------------------------
-        g.setFont(FontManager.getRunescapeSmallFont());
-        fm = g.getFontMetrics();
-
-        final int badgeH = ROW_HEIGHT + 4;
-        final int metaYTop = headerBottomY + 8;
-
-        int metaX = detailsBounds.x + pad;
-
-// Source badge
-        String srcBadge = shortSource(detailsTask.getSource());
-        int srcBadgeW = drawBevelBadge(g, fm, metaX, metaYTop, srcBadge, true);
-        metaX += srcBadgeW + 8;
-
-// Tier badge (full name)
-        String tierBadge = (detailsTask.getTier() == null) ? "?" : getString(detailsTask.getTier());
-        drawBevelBadge(g, fm, metaX, metaYTop, tierBadge, true);
-
-        // -----------------------------
-        // Content area
-        // -----------------------------
-        fm = g.getFontMetrics();
-        int contentLeft = detailsBounds.x + pad;
-        int contentTop = metaYTop + badgeH + 12;
-        int contentW = detailsBounds.width - (pad * 2);
-
-        int y = contentTop + fm.getAscent();
-
-        // Description
-        g.setColor(P.UI_GOLD);
-        g.drawString("Description", contentLeft, y);
-        y += ROW_HEIGHT;
-
-        String desc = safe(detailsTask.getDescription()).replace("\r", "").trim();
-        if (desc.isEmpty()) {
-            g.setColor(P.UI_TEXT_DIM);
-            g.drawString("None", contentLeft, y);
-            y += ROW_HEIGHT;
-        } else {
-            g.setColor(P.UI_TEXT);
-            for (String line : wrapText(desc, fm, contentW)) {
-                g.drawString(getString(line, fm, contentW), contentLeft, y);
-                y += ROW_HEIGHT;
-            }
-        }
-
-        // Divider between sections
-        y += 6;
-        g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 35));
-        g.drawLine(contentLeft, y - (fm.getAscent() / 2), contentLeft + contentW, y - (fm.getAscent() / 2));
-        y += 12;
-
-        // Prereqs
-        g.setColor(P.UI_GOLD);
-        g.drawString("Prereqs", contentLeft, y);
-        y += ROW_HEIGHT;
-
-        String prereqs = safe(detailsTask.getPrereqs()).replace("\r", "").trim();
-        if (!prereqs.isEmpty()) {
-            prereqs = prereqs
-                    .replaceAll("\\s*;\\s*", "\n")
-                    .replaceAll("\n{2,}", "\n")
-                    .trim();
-        }
-
-        if (prereqs.isEmpty()) {
-            g.setColor(P.UI_TEXT_DIM);
-            g.drawString("None", contentLeft, y);
-        } else {
-            g.setColor(P.UI_TEXT);
-            for (String para : prereqs.split("\n")) {
-                String p = para.trim();
-                if (p.isEmpty()) continue;
-
-                for (String line : wrapText(p, fm, contentW)) {
-                    g.drawString(getString(line, fm, contentW), contentLeft, y);
-                    y += ROW_HEIGHT;
-                }
-            }
-        }
-
-        // -----------------------------
-// Footer action bar
-// -----------------------------
-        boolean done = plugin.isTaskCompleted(detailsTask);
-
-        int footerPad = 12;
-        int footerH = ROW_HEIGHT + 10;
-
-        int footerY = detailsBounds.y + detailsBounds.height - footerH - footerPad;
-        int footerX = detailsBounds.x + footerPad;
-        int footerW = detailsBounds.width - (footerPad * 2);
-
-// Subtle divider above footer
-        g.setColor(new Color(
-                P.UI_GOLD.getRed(),
-                P.UI_GOLD.getGreen(),
-                P.UI_GOLD.getBlue(),
-                45
-        ));
-        g.drawLine(
-                footerX,
-                footerY - 6,
-                footerX + footerW,
-                footerY - 6
-        );
-
-        // Toggle button centered
-        String toggleText = done ? "Completed" : "Mark complete";
-        int btnW = done ? 120 : 140;
-
-        int btnX = detailsBounds.x + (detailsBounds.width - btnW) / 2;
-
-        detailsToggleBounds.setBounds(btnX, footerY, btnW, footerH);
-
-        drawPopupButton(
-                g,
-                fm,
-                detailsToggleBounds,
-                toggleText,
-                !done // disabled look if already completed
-        );
-
-        // Tooltip on hover for Completed button
-        net.runelite.api.Point rlMouse = client.getMouseCanvasPosition();
-        int mx = (rlMouse == null) ? -1 : rlMouse.getX();
-        int my = (rlMouse == null) ? -1 : rlMouse.getY();
-
-        if (done && detailsToggleBounds.contains(mx, my))
-        {
-            // Use small font for tooltip
-            Font old = g.getFont();
-            g.setFont(FontManager.getRunescapeSmallFont());
-            FontMetrics tfm = g.getFontMetrics();
-
-            String tip = "Click to mark incomplete";
-            drawTooltip(
-                    g,
-                    tfm,
-                    tip,
-                    detailsToggleBounds.x + (detailsToggleBounds.width / 2),  // center of button
-                    detailsToggleBounds.y
-            );
-
-
-            g.setFont(old);
-        }
-
-
-    }
-
-    private void drawPopupButton(Graphics2D g, FontMetrics fm, Rectangle bounds, String text, boolean enabled) {
-        Color bg = enabled ? new Color(32, 26, 17, 235) : new Color(32, 26, 17, 140);
-        drawBevelBox(g, bounds, bg);
-
-        if (enabled) {
-            g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 200));
-            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        }
-
-        g.setColor(enabled ? P.UI_TEXT : new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 140));
-
-        String drawText = getString(text, fm, bounds.width - 10);
-        int tw = fm.stringWidth(drawText);
-
-        g.drawString(drawText,
-                bounds.x + (bounds.width - tw) / 2,
-                centeredTextBaseline(bounds, fm));
-    }
-
-    private static String safe(String s) {
-        return s == null ? "" : s;
-    }
-
-
-    private java.util.List<String> wrapText(String text, FontMetrics fm, int maxWidth) {
-        java.util.List<String> out = new java.util.ArrayList<>();
-        if (text == null) return out;
-
-        String cleaned = text.trim().replace("\r", "");
-        if (cleaned.isEmpty()) return out;
-
-        for (String paragraph : cleaned.split("\n")) {
-            String p = paragraph.trim();
-            if (p.isEmpty()) {
-                out.add("");
-                continue;
-            }
-
-            String[] words = p.split("\\s+");
-            StringBuilder line = new StringBuilder();
-
-            for (String w : words) {
-                String candidate = (line.length() == 0) ? w : (line + " " + w);
-                if (fm.stringWidth(candidate) <= maxWidth) {
-                    line.setLength(0);
-                    line.append(candidate);
-                } else {
-                    if (line.length() > 0) {
-                        out.add(line.toString());
-                        line.setLength(0);
-                        line.append(w);
-                    } else {
-                        out.add(getString(w, fm, maxWidth));
-                    }
-                }
-            }
-
-            if (line.length() > 0) {
-                out.add(line.toString());
-            }
-        }
-
-        return out;
-    }
-
-    private String shortSource(TaskSource s) {
-        if (s == null) return "?";
-
-        switch (s) {
-            case COMBAT_ACHIEVEMENT:
-                return "CA";
-            case COLLECTION_LOG:
-                return "CL";
-            default:
-                String n = s.name();
-                return n.length() >= 2 ? n.substring(0, 2) : n;
-        }
-    }
-
-
-    private String shortTier(TaskTier t) {
-        if (t == null) return "?";
-
-        switch (t) {
-            case EASY:
-                return "E";
-            case MEDIUM:
-                return "M";
-            case HARD:
-                return "H";
-            case ELITE:
-                return "EL";
-            case MASTER:
-                return "MA";
-            default:
-                return t.name();
-        }
-    }
-
-    /**
-     * Draws a small bevel badge like your tabs/buttons.
-     * Returns the width used (so you can lay out next to it).
-     */
-    private int drawBevelBadge(Graphics2D g, FontMetrics fm, int x, int yTop, String text, boolean activeLook) {
-        // badge padding + sizing
-        final int padX = 8;
-        final int h = ROW_HEIGHT + 4; // slightly slimmer than full buttons
-        int textW = fm.stringWidth(text);
-        int w = Math.max(26, textW + padX * 2);
-
-        Rectangle r = new Rectangle(x, yTop, w, h);
-
-        // same style as your tabs/buttons
-        Color bg = activeLook ? new Color(78, 62, 38, 240) : new Color(32, 26, 17, 235);
-        drawBevelBox(g, r, bg);
-
-        // subtle gold outline
-        g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 160));
-        g.drawRect(r.x, r.y, r.width, r.height);
-
-        g.setColor(P.UI_TEXT);
-        g.drawString(text, r.x + (r.width - textW) / 2, centeredTextBaseline(r, fm));
-
-        return w;
-    }
-
-    private void drawTooltip(Graphics2D g, FontMetrics fm, String text, int anchorX, int anchorY)
-    {
-        if (text == null || text.trim().isEmpty()) return;
-
-        final int padX = 8;
-        final int padY = 6;
-
-        int tw = fm.stringWidth(text);
-        int w = tw + padX * 2;
-        int h = fm.getHeight() + padY * 2;
-
-        // Anchor-relative positioning (this is the key part)
-        int x = anchorX - w / 2;
-        int y = anchorY - h - 8;
-
-        // Clamp to panel bounds
-        x = Math.max(panelBounds.x + 6,
-                Math.min(x, panelBounds.x + panelBounds.width - w - 6));
-        y = Math.max(panelBounds.y + 6,
-                Math.min(y, panelBounds.y + panelBounds.height - h - 6));
-
-        Rectangle r = new Rectangle(x, y, w, h);
-
-        drawBevelBox(g, r, new Color(20, 16, 10, 245));
-        g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 120));
-        g.drawRect(r.x, r.y, r.width, r.height);
-
-        g.setColor(P.UI_TEXT);
-        g.drawString(text, r.x + padX, r.y + padY + fm.getAscent());
-    }
-
-
 
 }
