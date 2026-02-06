@@ -12,7 +12,9 @@ import com.amtrollin.xtremetasker.tasklist.models.TaskListQuery;
 import com.amtrollin.xtremetasker.ui.anim.OverlayAnimations;
 import com.amtrollin.xtremetasker.ui.tasks.TaskControlsRenderer;
 import com.amtrollin.xtremetasker.ui.tasks.TaskDetailsPopup;
+import com.amtrollin.xtremetasker.ui.tasks.TasksTabRenderer;
 import com.amtrollin.xtremetasker.ui.tasks.models.TaskControlsLayout;
+import com.amtrollin.xtremetasker.ui.tasks.models.TasksTabState;
 import com.amtrollin.xtremetasker.ui.current.CurrentTabLayout;
 import com.amtrollin.xtremetasker.ui.current.CurrentTabRenderer;
 import com.amtrollin.xtremetasker.ui.input.OverlayInputAccess;
@@ -23,11 +25,9 @@ import com.amtrollin.xtremetasker.ui.rules.RulesTabLayout;
 import com.amtrollin.xtremetasker.ui.rules.RulesTabRenderer;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskListScrollController;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskListViewController;
-import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsLayout;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsRenderer;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskSelectionModel;
 import com.amtrollin.xtremetasker.ui.style.UiPalette;
-import com.amtrollin.xtremetasker.ui.text.TaskLabelFormatter;
 import com.amtrollin.xtremetasker.ui.text.TextUtils;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -152,6 +152,18 @@ public class XtremeTaskerOverlay extends Overlay {
     private final TaskRowsRenderer taskRowsRendererTasks = new TaskRowsRenderer(PANEL_W_TASKS, PANEL_PADDING, ROW_HEIGHT, LIST_ROW_SPACING, STATUS_PIP_SIZE, STATUS_PIP_PAD_LEFT + 4, TASK_TEXT_PAD_LEFT + 4, P.ROW_HOVER_BG, P.ROW_SELECTED_BG, P.ROW_SELECTED_OUTLINE, P.ROW_DONE_BG, P.ROW_LINE, P.STRIKE_COLOR, P.UI_TEXT, P.UI_TEXT_DIM, P.PIP_RING, P.PIP_DONE_FILL, P.PIP_DONE_RING, P.UI_GOLD, P.UI_EDGE_LIGHT, P.UI_EDGE_DARK);
 
     private final RulesTabRenderer rulesTabRenderer = new RulesTabRenderer(PANEL_W_TASKS, PANEL_PADDING, ROW_HEIGHT, LIST_ROW_SPACING, P.UI_GOLD, P.UI_TEXT_DIM);
+    private final TasksTabRenderer tasksTabRenderer = new TasksTabRenderer(P);
+    private final TasksTabState tasksTabState = new TasksTabState(
+            taskQuery,
+            controls,
+            selectionModel,
+            tasksScroll,
+            taskListView,
+            tierTabBounds,
+            taskRowBounds,
+            taskCheckboxBounds,
+            taskListViewportBounds
+    );
 
 
     @Inject
@@ -289,6 +301,16 @@ public class XtremeTaskerOverlay extends Overlay {
             renderRulesTab(g, fm, panelX, textCursorY);
         }
 
+        if (taskDetailsPopup.isOpen()) {
+            taskDetailsPopup.render(
+                    g,
+                    fm,
+                    panelBounds,
+                    plugin::isTaskCompleted,
+                    client.getMouseCanvasPosition()
+            );
+        }
+
         animations.prune();
         return new Dimension(panelW, panelHeight);
     }
@@ -334,239 +356,27 @@ public class XtremeTaskerOverlay extends Overlay {
     }
 
     private void renderTasksTab(Graphics2D g, FontMetrics fm, int panelX, int cursorYBaseline) {
-        if (!plugin.hasTaskPackLoaded()) {
-            g.setColor(P.UI_TEXT_DIM);
-            g.drawString("No tasks loaded.", panelX + PANEL_PADDING, cursorYBaseline);
-            return;
-        }
-
-        final int panelW = panelBounds.width;
-        final int innerW = Math.max(0, panelW - 2 * PANEL_PADDING);
-
-        final TaskRowsRenderer rr = taskRowsRendererTasks;
-
-        // -----------------------------
-        // Tier tabs row
-        // -----------------------------
-        int tierTabH = ROW_HEIGHT + 6;
-        int tierTabW = (innerW - (TIER_TABS.size() - 1) * 4) / TIER_TABS.size();
-
-        int tierTabY = cursorYBaseline - fm.getAscent();
-        int x = panelX + PANEL_PADDING;
-
-        for (TaskTier t : TIER_TABS) {
-            Rectangle r = new Rectangle(x, tierTabY, tierTabW, tierTabH);
-            tierTabBounds.put(t, r);
-
-            int pctVal = plugin.getTierPercent(t);
-            String pct = pctVal + "%";
-
-            drawTierTabWithPercent(g, r, prettyTier(t), pct, pctVal, t == activeTierTab);
-
-
-            x += tierTabW + 4;
-        }
-
-        cursorYBaseline += tierTabH + 12;
-
-        // -----------------------------
-        // Controls (search/filter/sort)
-        // -----------------------------
         net.runelite.api.Point rlMouse = client.getMouseCanvasPosition();
         int hoverX = rlMouse == null ? -1 : rlMouse.getX();
         int hoverY = rlMouse == null ? -1 : rlMouse.getY();
 
-        cursorYBaseline = controlsRendererTasks.render(g, fm, panelX, cursorYBaseline, controls, taskQuery, prettyTier(activeTierTab), panelBounds.width, hoverX, hoverY);
-
-        // -----------------------------
-        // Progress line (with spacing + divider)
-        // -----------------------------
-        final int dividerPadTop = 5;     // space after controls
-        final int dividerPadBottom = 6;  // space before progress text
-        final int progressPadBottom = 8; // extra space after progress text
-
-        // Faint divider between controls and progress
-        cursorYBaseline += dividerPadTop;
-
-        g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 55));
-        int lineY = cursorYBaseline - fm.getAscent(); // align to current baseline region
-        g.drawLine(panelX + PANEL_PADDING, lineY, panelX + panelWidth() - PANEL_PADDING, lineY);
-
-        cursorYBaseline += dividerPadBottom;
-
-        // Slightly larger font for progress line only
-        Font oldFont = g.getFont();
-        g.setFont(FontManager.getRunescapeBoldFont());
-        FontMetrics pfm = g.getFontMetrics();
-
-        String progress = prettyTier(activeTierTab) + " progress: " + plugin.getTierProgressLabel(activeTierTab);
-        g.setColor(P.UI_TEXT);
-        g.drawString(TextUtils.truncateToWidth(progress, pfm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, cursorYBaseline);
-
-        // Restore font + advance cursor with better padding
-        g.setFont(oldFont);
-        fm = g.getFontMetrics();
-
-        cursorYBaseline += pfm.getHeight() + progressPadBottom;
-        // Task list hint (subtle instructional line)
-        g.setColor(new Color(
-                P.UI_TEXT_DIM.getRed(),
-                P.UI_TEXT_DIM.getGreen(),
-                P.UI_TEXT_DIM.getBlue(),
-                170
-        ));
-
-        // Visual-only padding so list math remains stable
-        int hintVisualOffset = -5;
-
-        String taskHint = "Task list: click circle to toggle status, click row for details";
-        g.drawString(
-                TextUtils.truncateToWidth(taskHint, fm, panelInnerTextMaxWidth()),
-                panelX + PANEL_PADDING,
-                cursorYBaseline + hintVisualOffset
+        tasksTabRenderer.render(
+                g,
+                fm,
+                panelX,
+                cursorYBaseline,
+                panelBounds,
+                tasksTabState,
+                controlsRendererTasks,
+                taskRowsRendererTasks,
+                plugin,
+                animations,
+                TIER_TABS,
+                activeTierTab,
+                this::getSortedTasksForTier,
+                hoverX,
+                hoverY
         );
-
-// Advance baseline using tight spacing to preserve row packing
-        cursorYBaseline += fm.getHeight() - 1;
-
-
-        // -----------------------------
-        // Tasks list
-        // -----------------------------
-        List<XtremeTask> tasks = getSortedTasksForTier(activeTierTab);
-
-        int navHintLines = 2;
-
-// Make the hint area tighter
-        int navHintPadTop = 0;
-        int hintPaddingBottom = 6; // instead of PANEL_PADDING
-
-        int hintBaselineY = panelBounds.y + panelBounds.height - hintPaddingBottom;
-
-        int navLineH = fm.getHeight();
-
-// Small win: shave a few pixels off the reserved area
-        int listBottomPad = (navHintLines * navLineH) + navHintPadTop - 2;
-
-        int listMaxBottom = hintBaselineY - listBottomPad;
-
-
-        Rectangle listPanelBounds = new Rectangle(panelBounds.x, panelBounds.y, panelBounds.width, Math.max(0, listMaxBottom - panelBounds.y));
-        // -----------------------------
-        // Task list background container
-        // -----------------------------
-        // Empty state
-        if (tasks.isEmpty()) {
-            int emptyTop = cursorYBaseline - fm.getAscent();
-            int emptyH = Math.max(0, listMaxBottom - emptyTop);
-
-            Rectangle emptyViewport = new Rectangle(panelX + PANEL_PADDING, emptyTop, panelInnerWidth(), emptyH);
-
-            taskListViewportBounds.setBounds(emptyViewport);
-            taskRowBounds.clear();
-
-            g.setColor(P.UI_TEXT_DIM);
-            String msg = hasActiveConstraints(taskQuery) ? "No matches." : "No tasks.";
-            int textY = emptyViewport.y + Math.max(ROW_HEIGHT, emptyViewport.height / 3);
-            g.drawString(TextUtils.truncateToWidth(msg, fm, emptyViewport.width), emptyViewport.x, textY);
-
-            displayTaskTierNavHints(g, fm, panelX, hintBaselineY, navLineH);
-
-            return;
-        }
-
-
-        // -----------------------------
-        // Compute viewport height + clamp scroll offset (prevents weird blank space)
-        // -----------------------------
-        int listTop = cursorYBaseline - fm.getAscent();
-
-// Small visual inset so first row isn't clipped
-        final int LIST_TOP_INSET = 5;
-        listTop += LIST_TOP_INSET;
-
-        int viewportH = Math.max(0, listMaxBottom - listTop);
-        int rowBlock = rr.rowBlock();
-
-// Snap to full rows (your existing fix)
-        if (rowBlock > 0) {
-            viewportH = (viewportH / rowBlock) * rowBlock;
-        }
-
-
-        int visible = tasksScroll.visibleRows(viewportH, rowBlock);
-        int maxOffset = Math.max(0, tasks.size() - visible);
-        if (tasksScroll.offsetRows > maxOffset) {
-            tasksScroll.offsetRows = maxOffset;
-        }
-
-        // Clamp selection index to list size (no snapping scroll; just prevents OOB)
-        int sel = selectionModel.getSelectedIndex();
-        if (sel < 0) sel = 0;
-        if (sel > tasks.size() - 1) {
-            selectionModel.setSelectedIndex(tasks.size() - 1);
-            sel = tasks.size() - 1;
-        }
-
-        // -----------------------------
-        // Render rows
-        // -----------------------------
-        boolean showTierPrefix = (taskQuery.tierScope == TaskListQuery.TierScope.ALL_TIERS);
-
-        TaskRowsLayout layout = rr.render(g, fm, panelX, cursorYBaseline, listPanelBounds, tasks, sel, tasksScroll.offsetRows, hoverX, hoverY, animations::completionProgress, plugin::isTaskCompleted, showTierPrefix);
-
-        taskListViewportBounds.setBounds(layout.viewportBounds);
-
-        // -----------------------------
-// Subtle frame around the list viewport (no fill)
-// -----------------------------
-        Rectangle v = layout.viewportBounds;
-        if (v.width > 0 && v.height > 0) {
-            // Outer frame
-            g.setColor(new Color(P.UI_GOLD.getRed(), P.UI_GOLD.getGreen(), P.UI_GOLD.getBlue(), 70));
-            g.drawRect(v.x - 2, v.y - 2, v.width + 4, v.height + 4);
-
-            // Inner bevel-ish lines (top/left light, bottom/right dark)
-            g.setColor(new Color(P.UI_EDGE_LIGHT.getRed(), P.UI_EDGE_LIGHT.getGreen(), P.UI_EDGE_LIGHT.getBlue(), 55));
-            g.drawLine(v.x - 1, v.y - 1, v.x + v.width + 2, v.y - 1);          // top
-            g.drawLine(v.x - 1, v.y - 1, v.x - 1, v.y + v.height + 2);         // left
-
-            g.setColor(new Color(P.UI_EDGE_DARK.getRed(), P.UI_EDGE_DARK.getGreen(), P.UI_EDGE_DARK.getBlue(), 85));
-            g.drawLine(v.x + v.width + 2, v.y - 1, v.x + v.width + 2, v.y + v.height + 2); // right
-            g.drawLine(v.x - 1, v.y + v.height + 2, v.x + v.width + 2, v.y + v.height + 2); // bottom
-        }
-
-        taskRowBounds.clear();
-        taskRowBounds.putAll(layout.rowBounds);
-
-        taskCheckboxBounds.clear();
-        taskCheckboxBounds.putAll(layout.checkboxBounds);
-
-
-        // Bottom hint
-        displayTaskTierNavHints(g, fm, panelX, hintBaselineY, navLineH);
-
-        // Render details popup on top of everything
-        if (taskDetailsPopup.isOpen()) {
-            taskDetailsPopup.render(
-                    g,
-                    fm,
-                    panelBounds,
-                    plugin::isTaskCompleted,
-                    client.getMouseCanvasPosition()
-            );
-        }
-
-    }
-
-    private void displayTaskTierNavHints(Graphics2D g, FontMetrics fm, int panelX, int hintBaselineY, int navLineH) {
-        g.setColor(new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 160));
-        String navHint1 = "[Keys] Tasks: Space/Enter - toggle status, Up/Down - scroll, Left/Right - switch tier tab";
-        String navHint2 = "Filters: 1/2/3 - source, Q/W/E - status, A - tier scope | Sorts: S/T/R";
-
-        g.drawString(TextUtils.truncateToWidth(navHint1, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, hintBaselineY - navLineH);
-
-        g.drawString(TextUtils.truncateToWidth(navHint2, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, hintBaselineY);
     }
 
 
@@ -919,7 +729,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
             @Override
             public XtremeTaskerPlugin plugin() {
-                return plugin;
+                return (XtremeTaskerPlugin) plugin;
             }
 
             @Override
@@ -1229,11 +1039,6 @@ public class XtremeTaskerOverlay extends Overlay {
         };
     }
 
-    // --------- UI primitives (kept in overlay) ---------
-    private String prettyTier(TaskTier t) {
-        return TaskLabelFormatter.tierLabel(t);
-    }
-
     private void drawTab(Graphics2D g, Rectangle bounds, String text, boolean active) {
         Color bg = active ? P.TAB_ACTIVE_BG : P.TAB_INACTIVE_BG;
         drawBevelBox(g, bounds, bg);
@@ -1276,58 +1081,6 @@ public class XtremeTaskerOverlay extends Overlay {
         g.drawString(drawText, tx, ty);
     }
 
-    private void drawTierTabWithPercent(Graphics2D g, Rectangle bounds, String leftText, String rightText, int pctValue, boolean active) {
-        Color bg = active ? new Color(78, 62, 38, 240) : new Color(32, 26, 17, 235);
-        drawBevelBox(g, bounds, bg);
-
-        if (active) {
-            g.setColor(P.UI_GOLD);
-            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        }
-
-        FontMetrics fm = g.getFontMetrics();
-
-        String pct = TextUtils.truncateToWidth(rightText, fm, 34);
-
-        int pctW = fm.stringWidth(pct);
-        int pctX = bounds.x + bounds.width - 4 - pctW;
-
-        int leftMaxW = Math.max(0, (pctX - (bounds.x + 4) - 4));
-        String tier = TextUtils.truncateToWidth(leftText, fm, leftMaxW);
-
-        int ty = centeredTextBaseline(bounds, fm);
-
-        g.setColor(active ? P.UI_TEXT : P.UI_TEXT_DIM);
-        g.drawString(tier, bounds.x + 4, ty);
-
-        g.setColor(active ? P.UI_TEXT_DIM : new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 180));
-        g.drawString(pct, pctX, ty);
-
-        // Completed-tier glow
-        if (pctValue >= 100)
-        {
-            int a = active ? 150 : 120;
-
-            Color glow = new Color(
-                    120, 200, 140,   // green
-                    a
-            );
-
-            // Outer soft ring
-            g.setColor(glow);
-            g.drawRect(bounds.x - 2, bounds.y - 2, bounds.width + 4, bounds.height + 4);
-
-            // Inner ring
-            g.setColor(new Color(120, 200, 140, a - 35));
-            g.drawRect(bounds.x - 1, bounds.y - 1, bounds.width + 2, bounds.height + 2);
-
-            // Subtle inner highlight
-            g.setColor(new Color(120, 200, 140, a - 65));
-            g.drawRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        }
-
-    }
-
     private void drawBevelBox(Graphics2D g, Rectangle r, Color fill) {
         g.setColor(fill);
         g.fillRect(r.x, r.y, r.width, r.height);
@@ -1364,21 +1117,6 @@ public class XtremeTaskerOverlay extends Overlay {
         }
 
         return new Point(canvasWidth - ICON_WIDTH - ICON_FALLBACK_RIGHT_MARGIN, ICON_FALLBACK_Y);
-    }
-
-    private static boolean hasActiveConstraints(TaskListQuery q) {
-        if (q == null) return false;
-
-        // Search constraint: user typed 3+ non-space chars
-        String s = (q.searchText == null) ? "" : q.searchText.trim();
-        if (s.length() >= 3) return true;
-
-        // Filter constraint: anything deviating from default "all included"
-        if (q.sourceFilter != TaskListQuery.SourceFilter.ALL) {
-            return true;
-        }
-
-        return q.statusFilter != TaskListQuery.StatusFilter.ALL;
     }
 
     // ---- panel sizing helpers ----
