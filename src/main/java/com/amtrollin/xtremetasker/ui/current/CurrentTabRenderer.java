@@ -3,14 +3,15 @@ package com.amtrollin.xtremetasker.ui.current;
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
-import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsRenderer;
 
 import java.awt.*;
 import java.util.List;
 import java.util.function.Function;
 
-import static com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay.getString;
+import static com.amtrollin.xtremetasker.ui.text.TaskLabelFormatter.tierLabel;
+import static com.amtrollin.xtremetasker.ui.text.TextUtils.truncateToWidth;
+import static com.amtrollin.xtremetasker.ui.text.TextUtils.wrapText;
 
 public final class CurrentTabRenderer
 {
@@ -93,14 +94,14 @@ public final class CurrentTabRenderer
         }
 
         String progress = prettyTier(tierForProgress) + ": " + (tierProgressLabel == null ? "" : tierProgressLabel.apply(tierForProgress));
-        progress = getString(progress, fm, panelWidth - 2 * panelPadding);
+        progress = truncateToWidth(progress, fm, panelWidth - 2 * panelPadding);
 
         g.setColor(uiTextDim);
         g.drawString(progress, panelX + panelPadding, cursorYBaseline);
         cursorYBaseline += rowHeight + 6;
 
         String currentLine = currentLineProvider != null ? currentLineProvider.apply(current) : "";
-        currentLine = getString(currentLine, fm, panelWidth - 2 * panelPadding);
+        currentLine = truncateToWidth(currentLine, fm, panelWidth - 2 * panelPadding);
 
         g.setColor(uiText);
         g.drawString(currentLine, panelX + panelPadding, cursorYBaseline);
@@ -208,7 +209,7 @@ public final class CurrentTabRenderer
     private static String prettyTier(TaskTier t)
     {
         if (t == null) return "";
-        return getString(t);
+        return tierLabel(t);
     }
 
     private void drawBevelBox(Graphics2D g, Rectangle r, Color fill)
@@ -238,64 +239,12 @@ public final class CurrentTabRenderer
                 continue;
             }
 
-            g.drawString(getString(line, fm, maxWidth), x, y);
+            g.drawString(truncateToWidth(line, fm, maxWidth), x, y);
             y += rowHeight;
             drawn++;
         }
 
         return y;
-    }
-
-    private List<String> wrapText(String text, FontMetrics fm, int maxWidth)
-    {
-        java.util.List<String> lines = new java.util.ArrayList<>();
-        if (text == null) return lines;
-
-        String cleaned = text.trim().replace("\r", "");
-        if (cleaned.isEmpty()) return lines;
-
-        for (String paragraph : cleaned.split("\n"))
-        {
-            String p = paragraph.trim();
-            if (p.isEmpty())
-            {
-                lines.add("");
-                continue;
-            }
-
-            String[] words = p.split("\\s+");
-            StringBuilder line = new StringBuilder();
-
-            for (String w : words)
-            {
-                String candidate = (line.length() == 0) ? w : (line + " " + w);
-                if (fm.stringWidth(candidate) <= maxWidth)
-                {
-                    line.setLength(0);
-                    line.append(candidate);
-                }
-                else
-                {
-                    if (line.length() > 0)
-                    {
-                        lines.add(line.toString());
-                        line.setLength(0);
-                        line.append(w);
-                    }
-                    else
-                    {
-                        lines.add(getString(w, fm, maxWidth));
-                    }
-                }
-            }
-
-            if (line.length() > 0)
-            {
-                lines.add(line.toString());
-            }
-        }
-
-        return lines;
     }
 
     private void drawSourceBadgeNearText(

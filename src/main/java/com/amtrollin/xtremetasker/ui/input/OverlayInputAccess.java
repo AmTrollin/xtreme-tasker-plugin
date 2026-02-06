@@ -1,6 +1,6 @@
 package com.amtrollin.xtremetasker.ui.input;
 
-import com.amtrollin.xtremetasker.XtremeTaskerPlugin;
+import com.amtrollin.xtremetasker.TaskerService;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.tasklist.models.TaskListQuery;
@@ -20,7 +20,7 @@ import java.util.Map;
 public interface OverlayInputAccess
 {
     Client client();
-    XtremeTaskerPlugin plugin();
+    TaskerService plugin();
 
     OverlayAnimations animations();
     TaskControlsLayout controlsLayout();
