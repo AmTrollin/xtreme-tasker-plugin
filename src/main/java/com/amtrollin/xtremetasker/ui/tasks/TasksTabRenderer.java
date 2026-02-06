@@ -13,10 +13,7 @@ import com.amtrollin.xtremetasker.ui.tasks.models.TasksTabState;
 import com.amtrollin.xtremetasker.ui.style.UiPalette;
 import net.runelite.client.ui.FontManager;
 
-import java.awt.Color;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.Rectangle;
+import java.awt.*;
 import java.util.List;
 import java.util.function.Function;
 

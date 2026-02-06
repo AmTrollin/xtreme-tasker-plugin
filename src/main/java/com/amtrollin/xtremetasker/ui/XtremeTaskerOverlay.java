@@ -3,7 +3,6 @@
 package com.amtrollin.xtremetasker.ui;
 
 import com.amtrollin.xtremetasker.TaskerService;
-import com.amtrollin.xtremetasker.XtremeTaskerPlugin;
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
 import com.amtrollin.xtremetasker.models.XtremeTask;
@@ -17,6 +16,8 @@ import com.amtrollin.xtremetasker.ui.tasks.models.TaskControlsLayout;
 import com.amtrollin.xtremetasker.ui.tasks.models.TasksTabState;
 import com.amtrollin.xtremetasker.ui.current.CurrentTabLayout;
 import com.amtrollin.xtremetasker.ui.current.CurrentTabRenderer;
+import com.amtrollin.xtremetasker.ui.current.CurrentTabViewRenderer;
+import com.amtrollin.xtremetasker.ui.current.models.CurrentTabState;
 import com.amtrollin.xtremetasker.ui.input.OverlayInputAccess;
 import com.amtrollin.xtremetasker.ui.input.OverlayKeyHandler;
 import com.amtrollin.xtremetasker.ui.input.OverlayMouseHandler;
@@ -145,6 +146,8 @@ public class XtremeTaskerOverlay extends Overlay {
     private final TaskRowsRenderer taskRowsRenderer = new TaskRowsRenderer(PANEL_W_TASKS, PANEL_PADDING, ROW_HEIGHT, LIST_ROW_SPACING, STATUS_PIP_SIZE, STATUS_PIP_PAD_LEFT, TASK_TEXT_PAD_LEFT, P.ROW_HOVER_BG, P.ROW_SELECTED_BG, P.ROW_SELECTED_OUTLINE, P.ROW_DONE_BG, P.ROW_LINE, P.STRIKE_COLOR, P.UI_TEXT, P.UI_TEXT_DIM, P.PIP_RING, P.PIP_DONE_FILL, P.PIP_DONE_RING, P.UI_GOLD, P.UI_EDGE_LIGHT, P.UI_EDGE_DARK);
 
     private final CurrentTabRenderer currentTabRenderer = new CurrentTabRenderer(PANEL_W_TASKS, PANEL_PADDING, ROW_HEIGHT, P.UI_GOLD, P.UI_TEXT, P.UI_TEXT_DIM, P.TAB_ACTIVE_BG, P.UI_EDGE_LIGHT, P.UI_EDGE_DARK, WIKI_BUTTON_TEXT);
+    private final CurrentTabViewRenderer currentTabViewRenderer = new CurrentTabViewRenderer(currentTabRenderer, P);
+    private final CurrentTabState currentTabState = new CurrentTabState(currentLayout);
 
 
     private final TaskControlsRenderer controlsRendererTasks = new TaskControlsRenderer(PANEL_W_TASKS, PANEL_PADDING, ROW_HEIGHT, P.TAB_INACTIVE_BG, P.UI_EDGE_LIGHT, P.UI_EDGE_DARK, P.UI_GOLD, P.UI_TEXT, P.UI_TEXT_DIM, P.INPUT_BG, P.INPUT_FOCUS_OUTLINE, P.PILL_ON_BG, P.PILL_OFF_BG);
@@ -329,30 +332,23 @@ public class XtremeTaskerOverlay extends Overlay {
 
         TaskSource src = (current != null) ? current.getSource() : null;
 
-        CurrentTabLayout layout = currentTabRenderer.render(g, fm, panelX, cursorYBaseline, panelBounds, plugin.hasTaskPackLoaded(), current, currentCompleted, rolling, plugin::getTierProgressLabel, null, (ignored) -> computeCurrentLineForRender(current, currentCompleted, fm), this::getTasksForTier, tierForProgress, src);
-
-        currentLayout.wikiButtonBounds.setBounds(layout.wikiButtonBounds);
-        currentLayout.rollButtonBounds.setBounds(layout.rollButtonBounds);
-        currentLayout.completeButtonBounds.setBounds(layout.completeButtonBounds);
-
-        if (rolling) {
-            currentLayout.rollButtonBounds.setBounds(0, 0, 0, 0);
-            currentLayout.completeButtonBounds.setBounds(0, 0, 0, 0);
-            return;
-        }
-
-        XtremeTask cur = plugin.getCurrentTask();
-        boolean curDone = cur != null && plugin.isTaskCompleted(cur);
-
-        boolean rollEnabled = (cur == null) || curDone;
-        boolean completeEnabled = (cur != null) && !curDone;
-
-        drawButton(g, currentLayout.completeButtonBounds, curDone ? "Completed" : "Mark complete", completeEnabled);
-        drawButton(g, currentLayout.rollButtonBounds, "Roll task", rollEnabled);
-
-        g.setColor(new Color(P.UI_TEXT_DIM.getRed(), P.UI_TEXT_DIM.getGreen(), P.UI_TEXT_DIM.getBlue(), 160));
-        String hint = "Keys: R - roll, C - complete, W - wiki";
-        g.drawString(TextUtils.truncateToWidth(hint, fm, panelInnerTextMaxWidth()), panelX + PANEL_PADDING, currentLayout.rollButtonBounds.y + currentLayout.rollButtonBounds.height + ROW_HEIGHT);
+        currentTabViewRenderer.render(
+                g,
+                fm,
+                panelX,
+                cursorYBaseline,
+                panelBounds,
+                currentTabState,
+                plugin.hasTaskPackLoaded(),
+                current,
+                currentCompleted,
+                rolling,
+                plugin::getTierProgressLabel,
+                (ignored) -> computeCurrentLineForRender(current, currentCompleted, fm),
+                this::getTasksForTier,
+                tierForProgress,
+                src
+        );
     }
 
     private void renderTasksTab(Graphics2D g, FontMetrics fm, int panelX, int cursorYBaseline) {
