@@ -4,17 +4,19 @@ import lombok.RequiredArgsConstructor;
 import net.runelite.api.VarClientInt;
 import net.runelite.client.input.KeyListener;
 
-
 import java.awt.event.KeyEvent;
 
-@RequiredArgsConstructor
 public final class OverlayKeyHandler implements KeyListener {
     private final OverlayInputAccess a;
+    private final TasksTabKeyHandler tasksTabKeyHandler;
+    private final CurrentTabKeyHandler currentTabKeyHandler;
 
-    // ---- chat message anti-spam ----
-    private static final long MSG_COOLDOWN_MS = 900; // tweak: 600–1200 feels good
-    private long lastMsgAtMs = 0;
-    private String lastMsg = null;
+    public OverlayKeyHandler(OverlayInputAccess a)
+    {
+        this.a = a;
+        this.tasksTabKeyHandler = new TasksTabKeyHandler(a);
+        this.currentTabKeyHandler = new CurrentTabKeyHandler(a);
+    }
 
 
     /**
@@ -24,28 +26,6 @@ public final class OverlayKeyHandler implements KeyListener {
     private boolean isClientTyping() {
         return a.client().getVarcIntValue(VarClientInt.INPUT_TYPE) != 0;
     }
-
-    private void notifyUser(String msg)
-    {
-        if (msg == null || msg.trim().isEmpty())
-        {
-            return;
-        }
-
-        long now = System.currentTimeMillis();
-
-        // If same message repeats rapidly, suppress it
-        if (msg.equals(lastMsg) && (now - lastMsgAtMs) < MSG_COOLDOWN_MS)
-        {
-            return;
-        }
-
-        lastMsgAtMs = now;
-        lastMsg = msg;
-
-        a.plugin().pushGameMessage(msg);
-    }
-
 
     @Override
     public void keyPressed(KeyEvent e) {
@@ -97,65 +77,14 @@ public final class OverlayKeyHandler implements KeyListener {
 
         // Normal key handling when search is NOT focused
         if (a.activeTab() == OverlayInputAccess.MainTab.TASKS) {
-            if (a.handleTasksKey(e)) {
-                // If the key changed selection/scroll, keep selection visible (keyboard UX)
-                int total = a.getSortedTasksForTier(a.activeTier()).size();
-                int viewportH = a.taskListViewportBounds().height;
-                int rowBlock = a.taskRowBlock();
-                if (total > 0 && viewportH > 0 && rowBlock > 0) {
-                    a.taskListView().ensureSelectionVisible(total, viewportH, rowBlock);
-                }
-
+            if (tasksTabKeyHandler.handleKeyPressed(e)) {
                 e.consume();
             }
             return;
         }
 
         if (a.activeTab() == OverlayInputAccess.MainTab.CURRENT) {
-            // Pre-checks so we can message when blocked
-            boolean handledOrBlocked = false;
-
-            // R = roll
-            if (code == KeyEvent.VK_R) {
-                // Your overlay logic: roll only if no current OR current is completed
-                // We don't have direct access to "current task" here, but plugin does.
-                // If plugin returns null current, roll is allowed.
-                var cur = a.plugin().getCurrentTask();
-                boolean curDone = (cur != null) && a.plugin().isTaskCompleted(cur);
-                boolean rollEnabled = (cur == null) || curDone;
-
-                if (!rollEnabled) {
-                    notifyUser("You can only roll a new task after completing the current one.");
-                    e.consume();
-                    return;
-                }
-
-                // allowed → fall through to normal handling
-                handledOrBlocked = true;
-            }
-
-            // C = complete
-            if (code == KeyEvent.VK_C) {
-                var cur = a.plugin().getCurrentTask();
-                if (cur == null) {
-                    notifyUser("No current task to complete.");
-                    e.consume();
-                    return;
-                }
-
-                // allowed → normal handling
-                handledOrBlocked = true;
-            }
-
-            // If it wasn't one of our guarded keys, just run normal handler
-            if (a.handleCurrentKey(e)) {
-                e.consume();
-                return;
-            }
-
-            // If it was a guarded key and we reached here, it should have been handled.
-            // (HandledOrBlocked is mostly for readability; no-op otherwise.)
-            if (handledOrBlocked) {
+            if (currentTabKeyHandler.handleKeyPressed(e)) {
                 e.consume();
             }
         }
