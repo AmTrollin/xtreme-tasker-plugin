@@ -405,8 +405,7 @@ public class XtremeTaskerOverlay extends Overlay {
         int mx = (rlMouse == null) ? -1 : rlMouse.getX();
         int my = (rlMouse == null) ? -1 : rlMouse.getY();
 
-        if (rulesLayout.syncProgressButtonBounds.contains(mx, my))
-        {
+        if (rulesLayout.syncProgressButtonBounds.contains(mx, my)) {
             Font old = g.getFont();
             g.setFont(FontManager.getRunescapeSmallFont());
             FontMetrics tfm = g.getFontMetrics();
@@ -417,8 +416,7 @@ public class XtremeTaskerOverlay extends Overlay {
             g.setFont(old);
         }
 
-        if (rulesLayout.taskerFaqLinkBounds.width > 0)
-        {
+        if (rulesLayout.taskerFaqLinkBounds.width > 0) {
             buttonRenderer.drawButton(g, rulesLayout.taskerFaqLinkBounds, "TaskerFAQ", true);
         }
 
