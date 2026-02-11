@@ -106,7 +106,7 @@ public class XtremeTaskerOverlay extends Overlay {
 
     // ---- client/plugin ----
     private final Client client;
-    private final TaskerService plugin;
+    private final XtremeTaskerPlugin plugin;
 
     @Getter
     private final MouseAdapter mouseAdapter;

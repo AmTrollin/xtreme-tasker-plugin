@@ -81,6 +81,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
     private String activeAccountKey = null;
     private String currentTaskId = null;
+    
+    // TEMPORARY: Track which predetermined task to roll next
+    private int predeterminedTasksRolled = 0;
 
     private final List<XtremeTask> tasks = new ArrayList<>();
     private boolean taskPackLoaded = false;
@@ -265,6 +268,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         state.setManualCompletedTaskIds(new HashSet<>(manualCompletedTaskIds));
         state.setSyncedCompletedTaskIds(new HashSet<>(syncedCompletedTaskIds));
         state.setCurrentTaskId(currentTaskId);
+        state.setPredeterminedTasksRolled(predeterminedTasksRolled);
 
         String key = stateConfigKeyForAccount(accountKey);
         configManager.setConfiguration(CONFIG_GROUP, key, gson.toJson(state));
@@ -305,6 +309,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                     syncedCompletedTaskIds.addAll(state.getSyncedCompletedTaskIds());
                 }
                 currentTaskId = state.getCurrentTaskId();
+                predeterminedTasksRolled = state.getPredeterminedTasksRolled();
             }
         }
         catch (Exception e)
@@ -403,6 +408,28 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     // ---------- core actions ----------
 
     public XtremeTask rollRandomTask() {
+        // TEMPORARY: First 3 tasks are predetermined for husband's progress recovery
+        // TODO: Remove this block after the first 3 tasks are rolled
+        if (predeterminedTasksRolled < 3) {
+            String[] predeterminedTaskIds = {
+                "collection_log_easy_get-1-piece-of-farmer-s-equipment_001_b9239dbfc9",   // One farmer's piece outfit (EASY)
+                "combat_achievement_easy_the-walking-volcano_001_feba638d34",              // Walking volcano
+                "collection_log_easy_get-infinity-boots_001_e72c26e3b9"                    // Infinity boots
+            };
+            
+            String targetTaskId = predeterminedTaskIds[predeterminedTasksRolled];
+            XtremeTask predeterminedTask = tasks.stream()
+                .filter(t -> t.getId().equals(targetTaskId))
+                .findFirst()
+                .orElse(null);
+            
+            if (predeterminedTask != null) {
+                return predeterminedTask;
+            }
+            // If predetermined task is not found, fall through to random
+        }
+        // END TEMPORARY
+        
         TaskTier currentTier = getCurrentTier();
         if (currentTier == null) return null;
 
@@ -431,6 +458,11 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
         XtremeTask newTask = rollRandomTask();
         setCurrentTask(newTask);
+        
+        // TEMPORARY: Increment predetermined task counter when rolling
+        if (predeterminedTasksRolled < 3) {
+            predeterminedTasksRolled++;
+        }
 
         currentTaskId = (newTask != null) ? newTask.getId() : null;
         dirty = true;
