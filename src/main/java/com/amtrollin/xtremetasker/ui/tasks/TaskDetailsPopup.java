@@ -8,10 +8,7 @@ import com.amtrollin.xtremetasker.ui.text.TaskLabelFormatter;
 import com.amtrollin.xtremetasker.ui.text.TextUtils;
 import net.runelite.client.ui.FontManager;
 
-import java.awt.Color;
-import java.awt.FontMetrics;
-import java.awt.Graphics2D;
-import java.awt.Rectangle;
+import java.awt.*;
 import java.util.function.Function;
 
 import static com.amtrollin.xtremetasker.ui.style.UiConstants.ROW_HEIGHT;
