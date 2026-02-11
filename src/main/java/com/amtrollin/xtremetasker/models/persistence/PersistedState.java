@@ -14,6 +14,4 @@ public class PersistedState {
     private Set<String> manualCompletedTaskIds = new HashSet<>();
     private Set<String> syncedCompletedTaskIds = new HashSet<>();
     private String currentTaskId;
-    // TEMPORARY: for predetermined task rolling
-    private int predeterminedTasksRolled = 0;
 }
