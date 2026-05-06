@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "id": "combat_achievement_easy_barrows-novice_001",
+      "name": "Barrows Novice",
+      "source": "COMBAT_ACHIEVEMENT",
+      "tier": "EASY",
+      "prereqs": "Priest in Peril quest",
+      "wikiTitle": "Barrows Novice",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Barrows_Novice",
+      "description": "Kill the Barrows brothers and loot the chest 10 times",
+      "verification": {
+        "type": "COMBAT_ACHIEVEMENT",
+        "taskId": 157
+      }
+    },
+    {
+      "id": "collection_log_easy_get-bolt-racks-from-barrows_001",
+      "name": "Get bolt racks from Barrows",
+      "source": "COLLECTION_LOG",
+      "tier": "EASY",
+      "prereqs": "Priest in Peril quest",
+      "wikiTitle": "Bolt rack",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Bolt_rack",
+      "verification": {
+        "type": "COLLECTION_LOG",
+        "itemIds": [4740],
+        "count": 1
+      }
+    },
+    {
+      "id": "achievement_diary_easy_lumbridge-easy_001",
+      "name": "Complete Lumbridge Easy Diary",
+      "source": "ACHIEVEMENT_DIARY",
+      "tier": "EASY",
+      "prereqs": "Various skill requirements",
+      "wikiTitle": "Lumbridge Diary",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Lumbridge_Diary",
+      "verification": {
+        "type": "ACHIEVEMENT_DIARY",
+        "region": "LUMBRIDGE_DRAYNOR",
+        "difficulty": "EASY"
+      }
+    },
+    {
+      "id": "combat_achievement_easy_noxious-foe_001",
+      "name": "Noxious Foe",
+      "source": "COMBAT_ACHIEVEMENT",
+      "tier": "EASY",
+      "prereqs": "60 Slayer",
+      "wikiTitle": "Noxious Foe",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Noxious_Foe",
+      "description": "Kill an aberrant spectre",
+      "verification": {
+        "type": "COMBAT_ACHIEVEMENT",
+        "taskId": 1
+      }
+    },
+    {
+      "id": "collection_log_medium_get-3-barrows-uniques_001",
+      "name": "Get 3 Barrows Uniques",
+      "source": "COLLECTION_LOG",
+      "tier": "MEDIUM",
+      "prereqs": "Priest in Peril quest",
+      "wikiTitle": "Barrows equipment",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Barrows_equipment",
+      "verification": {
+        "type": "COLLECTION_LOG",
+        "itemIds": [4708, 4710, 4712, 4714, 4716, 4718, 4720, 4722, 4724, 4726, 4728, 4730, 4732, 4734, 4736, 4738, 4745, 4747, 4749, 4751, 4753, 4755, 4757, 4759],
+        "count": 3
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@ package com.amtrollin.xtremetasker.ui.current;
 
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
+import com.amtrollin.xtremetasker.models.PrerequisiteStatus;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.ui.current.models.CurrentTabState;
 import com.amtrollin.xtremetasker.ui.style.UiPalette;
@@ -41,6 +42,7 @@ public final class CurrentTabViewRenderer
             boolean rolling,
             Function<TaskTier, String> tierProgressLabel,
             Function<XtremeTask, String> currentLineProvider,
+            Function<XtremeTask, List<PrerequisiteStatus>> prerequisiteStatusProvider,
             Function<TaskTier, List<XtremeTask>> tasksForTierProvider,
             TaskTier tierForProgress,
             TaskSource currentSource
@@ -59,6 +61,7 @@ public final class CurrentTabViewRenderer
                 tierProgressLabel,
                 null,
                 currentLineProvider,
+                prerequisiteStatusProvider,
                 tasksForTierProvider,
                 tierForProgress,
                 currentSource

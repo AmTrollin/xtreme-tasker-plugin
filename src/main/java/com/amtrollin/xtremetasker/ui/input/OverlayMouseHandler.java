@@ -323,8 +323,18 @@ public final class OverlayMouseHandler extends MouseAdapter {
                 e.consume();
                 return e;
             }
-            if (a.rulesLayout().syncProgressButtonBounds.contains(p)) {
-                // Placeholder: disabled for now, do nothing (or show a message later)
+            if (a.rulesLayout().syncClogsButtonBounds.contains(p)) {
+                a.plugin().syncCollectionLogsAndPersist();
+                e.consume();
+                return e;
+            }
+            if (a.rulesLayout().syncCAsButtonBounds.contains(p)) {
+                a.plugin().syncCombatAchievementsAndPersist();
+                e.consume();
+                return e;
+            }
+            if (a.rulesLayout().clogDebugButtonBounds.contains(p)) {
+                a.plugin().debugCollectionLogCacheAndReport();
                 e.consume();
                 return e;
             }
@@ -360,7 +370,9 @@ public final class OverlayMouseHandler extends MouseAdapter {
                         && (
                         a.rulesLayout().taskerFaqLinkBounds.contains(p)
                                 || a.rulesLayout().reloadButtonBounds.contains(p)
-                                || a.rulesLayout().syncProgressButtonBounds.contains(p)
+                            || a.rulesLayout().syncClogsButtonBounds.contains(p)
+                            || a.rulesLayout().syncCAsButtonBounds.contains(p)
+                            || a.rulesLayout().clogDebugButtonBounds.contains(p)
                 );
 
 

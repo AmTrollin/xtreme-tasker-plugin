@@ -2,6 +2,7 @@ package com.amtrollin.xtremetasker.models;
 
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
+import com.amtrollin.xtremetasker.models.verification.TaskVerification;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,10 +21,11 @@ public class XtremeTask {
     private final String description;
     private final String prereqs;
     private final String wikiUrl;
+    private final TaskVerification verification;
 
     // Backwards-compatible constructor
     public XtremeTask(String id, String name, TaskSource source, TaskTier tier) {
-        this(id, name, source, tier, null, null, null, null, null);
+        this(id, name, source, tier, null, null, null, null, null, null);
     }
 
     // Full constructor (used by JSON pack, now includes enrichment)
@@ -36,7 +38,8 @@ public class XtremeTask {
             String iconKey,
             String description,
             String prereqs,
-            String wikiUrl
+                String wikiUrl,
+                TaskVerification verification
     ) {
         this.name = safeTrimToNull(name);
         this.source = source;
@@ -46,6 +49,7 @@ public class XtremeTask {
         this.description = safeTrimToNull(description);
         this.prereqs = safeTrimToNull(prereqs);
         this.wikiUrl = safeTrimToNull(wikiUrl);
+        this.verification = verification;
 
         // Critical: NEVER allow null/blank IDs (null IDs cause completion collisions)
         String trimmedId = safeTrimToNull(id);
@@ -89,6 +93,10 @@ public class XtremeTask {
 
     public String getWikiUrl() {
         return wikiUrl;
+    }
+
+    public TaskVerification getVerification() {
+        return verification;
     }
 
     @Override

@@ -313,6 +313,7 @@ public class XtremeTaskerOverlay extends Overlay {
                     fm,
                     panelBounds,
                     plugin::isTaskCompleted,
+                    plugin::getPrerequisiteStatuses,
                     client.getMouseCanvasPosition()
             );
         }
@@ -348,6 +349,7 @@ public class XtremeTaskerOverlay extends Overlay {
                 rolling,
                 plugin::getTierProgressLabel,
                 (ignored) -> computeCurrentLineForRender(current, currentCompleted, fm),
+                plugin::getPrerequisiteStatuses,
                 this::getTasksForTier,
                 tierForProgress,
                 src
@@ -389,31 +391,23 @@ public class XtremeTaskerOverlay extends Overlay {
         rulesLayout.reloadButtonBounds.setBounds(layout.reloadButtonBounds);
         rulesLayout.totalContentRows = layout.totalContentRows;
         rulesLayout.taskerFaqLinkBounds.setBounds(layout.taskerFaqLinkBounds);
-        rulesLayout.syncProgressButtonBounds.setBounds(layout.syncProgressButtonBounds);
+        rulesLayout.syncClogsButtonBounds.setBounds(layout.syncClogsButtonBounds);
+        rulesLayout.syncCAsButtonBounds.setBounds(layout.syncCAsButtonBounds);
+        rulesLayout.clogDebugButtonBounds.setBounds(layout.clogDebugButtonBounds);
 
         rulesViewportBounds.setBounds(layout.viewportBounds);
 
         if (rulesLayout.reloadButtonBounds.width > 0) {
             buttonRenderer.drawButton(g, rulesLayout.reloadButtonBounds, "Reload tasks list", true);
         }
-        if (rulesLayout.syncProgressButtonBounds.width > 0) {
-            buttonRenderer.drawButton(g, rulesLayout.syncProgressButtonBounds, "Sync In Game Progress", false); // disabled placeholder
+        if (rulesLayout.syncClogsButtonBounds.width > 0) {
+            buttonRenderer.drawButton(g, rulesLayout.syncClogsButtonBounds, "Sync CLOGs", true);
         }
-
-        // Hover tooltip for disabled "Sync In Game Progress"
-        net.runelite.api.Point rlMouse = client.getMouseCanvasPosition();
-        int mx = (rlMouse == null) ? -1 : rlMouse.getX();
-        int my = (rlMouse == null) ? -1 : rlMouse.getY();
-
-        if (rulesLayout.syncProgressButtonBounds.contains(mx, my)) {
-            Font old = g.getFont();
-            g.setFont(FontManager.getRunescapeSmallFont());
-            FontMetrics tfm = g.getFontMetrics();
-
-            Rectangle r = rulesLayout.syncProgressButtonBounds;
-
-
-            g.setFont(old);
+        if (rulesLayout.syncCAsButtonBounds.width > 0) {
+            buttonRenderer.drawButton(g, rulesLayout.syncCAsButtonBounds, "Sync CAs", true);
+        }
+        if (rulesLayout.clogDebugButtonBounds.width > 0) {
+            buttonRenderer.drawButton(g, rulesLayout.clogDebugButtonBounds, "CLOG Debug", true);
         }
 
         if (rulesLayout.taskerFaqLinkBounds.width > 0) {

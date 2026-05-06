@@ -58,7 +58,9 @@ public final class RulesTabRenderer
         RulesTabLayout layout = new RulesTabLayout();
         layout.taskerFaqLinkBounds.setBounds(0, 0, 0, 0);
         layout.reloadButtonBounds.setBounds(0, 0, 0, 0);
-        layout.syncProgressButtonBounds.setBounds(0, 0, 0, 0);
+        layout.syncClogsButtonBounds.setBounds(0, 0, 0, 0);
+        layout.syncCAsButtonBounds.setBounds(0, 0, 0, 0);
+        layout.clogDebugButtonBounds.setBounds(0, 0, 0, 0);
 
         int bx = panelX + panelPadding;
         int viewportY = cursorYBaseline - fm.getAscent();
@@ -92,20 +94,22 @@ public final class RulesTabRenderer
         {
             String line = lines.get(idx);
 
-            // ---- Data sync buttons (two-button row) ----
+            // ---- Data sync buttons (four-button row) ----
             if (LINE_DATA_SYNC_BUTTON_ROW.equals(line))
             {
-                int btnW = viewportW / 3; // keep your existing size
+                int gap = 8;
+                int btnW = (viewportW - (gap * 3)) / 4;
                 int btnH = rowHeight + 10;
-                int gap = 10;
 
-                int totalW = (btnW * 2) + gap;
+                int totalW = (btnW * 4) + (gap * 3);
 
                 int startX = bx + (viewportW - totalW) / 2;
                 int by = drawY - fm.getAscent();
 
                 layout.reloadButtonBounds.setBounds(startX, by, btnW, btnH);
-                layout.syncProgressButtonBounds.setBounds(startX + btnW + gap, by, btnW, btnH);
+                layout.syncClogsButtonBounds.setBounds(startX + btnW + gap, by, btnW, btnH);
+                layout.syncCAsButtonBounds.setBounds(startX + (btnW * 2) + (gap * 2), by, btnW, btnH);
+                layout.clogDebugButtonBounds.setBounds(startX + (btnW * 3) + (gap * 3), by, btnW, btnH);
 
                 drawY += rb;
                 continue;
@@ -173,7 +177,7 @@ public final class RulesTabRenderer
                     line.equals("Rules")
                             || line.equals("Boss combat training allowance")
                             || line.equals("Official Tasker rules")
-                            || line.equals("Syncing account progress [COMING SOON!]")
+                            || line.equals("Syncing account progress")
                             || line.equals("Refreshing task data");
 
             // ---- Rules main title (bigger) ----
@@ -273,10 +277,11 @@ public final class RulesTabRenderer
                         + "Your current tasks and progress will be preserved.";
         lines.addAll(TextUtils.wrapText(reloadDesc, fm, maxWidth));
         lines.add("");
-        lines.add("Syncing account progress [COMING SOON!]");
-// Description for Sync In-Game Progress (coming soon)
+        lines.add("Syncing account progress");
+    // Description for Sync In-Game Progress
         String progressDesc =
-                "Detect and mark completed tasks based on your existing in-game achievements.";
+            "Use Sync CLOGs and Sync CAs to mark tasks you already completed in-game. "
+                + "For collection log sync, open collection log sections at least once so RuneLite can read item states.";
         lines.addAll(TextUtils.wrapText(progressDesc, fm, maxWidth));
         lines.add("");
 

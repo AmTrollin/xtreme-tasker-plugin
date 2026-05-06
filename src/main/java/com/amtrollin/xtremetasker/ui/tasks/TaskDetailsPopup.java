@@ -1,6 +1,7 @@
 package com.amtrollin.xtremetasker.ui.tasks;
 
 import com.amtrollin.xtremetasker.models.XtremeTask;
+import com.amtrollin.xtremetasker.models.PrerequisiteStatus;
 import com.amtrollin.xtremetasker.ui.style.UiPalette;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskListScrollController;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsRenderer;
@@ -9,6 +10,7 @@ import com.amtrollin.xtremetasker.ui.text.TextUtils;
 import net.runelite.client.ui.FontManager;
 
 import java.awt.*;
+import java.util.List;
 import java.util.function.Function;
 
 import static com.amtrollin.xtremetasker.ui.style.UiConstants.ROW_HEIGHT;
@@ -107,6 +109,7 @@ public final class TaskDetailsPopup
             FontMetrics fm,
             Rectangle panelBounds,
             Function<XtremeTask, Boolean> isCompleted,
+                Function<XtremeTask, List<PrerequisiteStatus>> prerequisiteStatusProvider,
             net.runelite.api.Point mouse
     )
     {
@@ -236,18 +239,47 @@ public final class TaskDetailsPopup
         y += ROW_HEIGHT;
 
         String prereqs = safe(task.getPrereqs()).replace("\r", "").trim();
-        if (!prereqs.isEmpty())
+        List<PrerequisiteStatus> prerequisiteStatuses = (prerequisiteStatusProvider == null)
+                ? List.of()
+                : prerequisiteStatusProvider.apply(task);
+
+        if ((prerequisiteStatuses == null || prerequisiteStatuses.isEmpty()) && !prereqs.isEmpty())
         {
-            prereqs = prereqs
-                    .replaceAll("\\s*;\\s*", "\n")
-                    .replaceAll("\n{2,}", "\n")
-                    .trim();
+            prereqs = prereqs.replaceAll("\\s*;\\s*", "\n").replaceAll("\n{2,}", "\n").trim();
         }
 
-        if (prereqs.isEmpty())
+        if ((prerequisiteStatuses == null || prerequisiteStatuses.isEmpty()) && prereqs.isEmpty())
         {
             g.setColor(palette.UI_TEXT_DIM);
             g.drawString("None", contentLeft, y);
+        }
+        else if (prerequisiteStatuses != null && !prerequisiteStatuses.isEmpty())
+        {
+            for (PrerequisiteStatus status : prerequisiteStatuses)
+            {
+                String lineText = "- " + status.getText();
+                for (String line : TextUtils.wrapText(lineText, fm, contentW))
+                {
+                    String drawLine = TextUtils.truncateToWidth(line, fm, contentW);
+                    g.setColor(status.isCompleted() ? palette.UI_TEXT_DIM : palette.UI_TEXT);
+                    g.drawString(drawLine, contentLeft, y);
+
+                    if (status.isCompleted())
+                    {
+                        int lineW = fm.stringWidth(drawLine);
+                        int strikeY = y - (fm.getAscent() / 3);
+                        g.setColor(new Color(
+                                palette.UI_TEXT_DIM.getRed(),
+                                palette.UI_TEXT_DIM.getGreen(),
+                                palette.UI_TEXT_DIM.getBlue(),
+                                170
+                        ));
+                        g.drawLine(contentLeft, strikeY, contentLeft + lineW, strikeY);
+                    }
+
+                    y += ROW_HEIGHT;
+                }
+            }
         }
         else
         {

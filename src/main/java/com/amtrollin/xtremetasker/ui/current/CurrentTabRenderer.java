@@ -2,6 +2,7 @@ package com.amtrollin.xtremetasker.ui.current;
 
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
+import com.amtrollin.xtremetasker.models.PrerequisiteStatus;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.ui.tasklist.TaskRowsRenderer;
 
@@ -70,6 +71,7 @@ public final class CurrentTabRenderer
             Function<TaskTier, String> tierProgressLabel,
             Function<TaskTier, Integer> tierPercent, // optional, can be null
             Function<XtremeTask, String> currentLineProvider,
+            Function<XtremeTask, List<PrerequisiteStatus>> prerequisiteStatusProvider,
             Function<TaskTier, List<XtremeTask>> tasksForTierProvider,
             TaskTier tierForProgress,
             TaskSource currentSource
@@ -150,13 +152,24 @@ public final class CurrentTabRenderer
 
             if (prereqs != null && !prereqs.trim().isEmpty())
             {
-                String formatted = prereqs
-                        .replace("\r", "")
-                        .replaceAll("\\s*;\\s*", "\n")
-                        .replaceAll("\n{2,}", "\n")
-                        .trim();
+                List<PrerequisiteStatus> statuses = (prerequisiteStatusProvider == null)
+                        ? List.of()
+                        : prerequisiteStatusProvider.apply(current);
 
-                cursorYBaseline = drawWrapped(g, fm, formatted, x, cursorYBaseline, maxW, 6);
+                if (statuses == null || statuses.isEmpty())
+                {
+                    String formatted = prereqs
+                            .replace("\r", "")
+                            .replaceAll("\\s*;\\s*", "\n")
+                            .replaceAll("\n{2,}", "\n")
+                            .trim();
+
+                    cursorYBaseline = drawWrapped(g, fm, formatted, x, cursorYBaseline, maxW, 6);
+                }
+                else
+                {
+                    cursorYBaseline = drawPrerequisites(g, fm, x, cursorYBaseline, maxW, statuses, 6);
+                }
             }
             else
             {
@@ -242,6 +255,49 @@ public final class CurrentTabRenderer
             g.drawString(truncateToWidth(line, fm, maxWidth), x, y);
             y += rowHeight;
             drawn++;
+        }
+
+        return y;
+    }
+
+    private int drawPrerequisites(
+            Graphics2D g,
+            FontMetrics fm,
+            int x,
+            int yBaseline,
+            int maxWidth,
+            List<PrerequisiteStatus> statuses,
+            int maxLines
+    )
+    {
+        int y = yBaseline;
+        int drawn = 0;
+
+        for (PrerequisiteStatus status : statuses)
+        {
+            String lineText = "- " + status.getText();
+            for (String line : wrapText(lineText, fm, maxWidth))
+            {
+                if (drawn >= maxLines)
+                {
+                    return y;
+                }
+
+                String drawLine = truncateToWidth(line, fm, maxWidth);
+                g.setColor(status.isCompleted() ? uiTextDim : uiText);
+                g.drawString(drawLine, x, y);
+
+                if (status.isCompleted())
+                {
+                    int lineW = fm.stringWidth(drawLine);
+                    int strikeY = y - (fm.getAscent() / 3);
+                    g.setColor(new Color(uiTextDim.getRed(), uiTextDim.getGreen(), uiTextDim.getBlue(), 170));
+                    g.drawLine(x, strikeY, x + lineW, strikeY);
+                }
+
+                y += rowHeight;
+                drawn++;
+            }
         }
 
         return y;

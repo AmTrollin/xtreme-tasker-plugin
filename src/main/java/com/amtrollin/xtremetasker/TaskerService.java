@@ -1,6 +1,7 @@
 package com.amtrollin.xtremetasker;
 
 import com.amtrollin.xtremetasker.enums.TaskTier;
+import com.amtrollin.xtremetasker.models.PrerequisiteStatus;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 
 import java.util.List;
@@ -30,6 +31,14 @@ public interface TaskerService
     void rollRandomTaskAndPersist();
 
     void reloadTaskPack();
+
+    void syncCombatAchievementsAndPersist();
+
+    void syncCollectionLogsAndPersist();
+
+    void debugCollectionLogCacheAndReport();
+
+    List<PrerequisiteStatus> getPrerequisiteStatuses(XtremeTask task);
 
     void pushGameMessage(String msg);
 }

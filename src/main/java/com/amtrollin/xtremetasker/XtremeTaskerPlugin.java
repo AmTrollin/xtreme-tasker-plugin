@@ -2,9 +2,14 @@ package com.amtrollin.xtremetasker;
 
 import com.amtrollin.xtremetasker.enums.TaskSource;
 import com.amtrollin.xtremetasker.enums.TaskTier;
+import com.amtrollin.xtremetasker.models.PrerequisiteStatus;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.models.persistence.PersistedState;
+import com.amtrollin.xtremetasker.models.verification.TaskVerification;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
+import com.amtrollin.xtremetasker.verification.CollectionLogService;
+import com.amtrollin.xtremetasker.verification.CombatAchievementService;
+import com.amtrollin.xtremetasker.verification.PrerequisiteTrackerService;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.inject.Provides;
@@ -29,6 +34,8 @@ import javax.inject.Inject;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -65,6 +72,12 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     private ClientThread clientThread;
     @Inject
     private KeyManager keyManager;
+    @Inject
+    private CollectionLogService collectionLogService;
+    @Inject
+    private CombatAchievementService combatAchievementService;
+    @Inject
+    private PrerequisiteTrackerService prerequisiteTrackerService;
 
     private final Gson gson = new GsonBuilder().create();
     private final Random random = new Random();
@@ -89,10 +102,17 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     private int flushTickCounter = 0;
     private static final int FLUSH_EVERY_TICKS = 10; // ~6s (game tick ~0.6s)
 
+    private final Map<String, Integer> caTaskIdsByName = new HashMap<>();
+    private final Map<String, Integer> caTaskIdsByNormalizedName = new HashMap<>();
+    private static final Pattern CA_MAPPING_LINE = Pattern.compile("^\\s*\"(.+)\"\\s*:\\s*(\\d+)\\s*,?\\s*$");
+
 
     @Override
     protected void startUp() {
         log.info("Xtreme Tasker started");
+
+        collectionLogService.startUp();
+        loadCombatAchievementMappings();
 
         updateOverlayState();
         rebuildTierCounts();
@@ -121,6 +141,8 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     @Override
     protected void shutDown() {
         log.info("Xtreme Tasker stopped");
+
+        collectionLogService.shutDown();
 
         if (activeAccountKey != null) {
             saveStateForAccount(activeAccountKey);
@@ -221,6 +243,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                     saveStateForAccount(activeAccountKey);
                     dirty = false;
                 }
+
+                // Auto-sync all CAs on login — varp data is always available.
+                clientThread.invokeLater(this::silentSyncCombatAchievements);
             }
         }
 
@@ -515,6 +540,253 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         clientThread.invokeLater(this::reloadTaskPackInternal);
     }
 
+    /** Silently syncs all CA completions without printing a chat message. */
+    private void silentSyncCombatAchievements()
+    {
+        if (!hasTaskPackLoaded())
+        {
+            return;
+        }
+
+        int newlySynced = 0;
+
+        for (XtremeTask task : tasks)
+        {
+            if (task.getSource() != TaskSource.COMBAT_ACHIEVEMENT)
+            {
+                continue;
+            }
+
+            if (manualCompletedTaskIds.contains(task.getId()))
+            {
+                continue;
+            }
+
+            Integer taskId = resolveCombatAchievementTaskId(task);
+            if (taskId == null)
+            {
+                continue;
+            }
+
+            if (combatAchievementService.isTaskComplete(taskId))
+            {
+                if (syncedCompletedTaskIds.add(task.getId()))
+                {
+                    newlySynced++;
+                }
+            }
+        }
+
+        if (newlySynced > 0)
+        {
+            rebuildTierCounts();
+            dirty = true;
+            if (activeAccountKey != null)
+            {
+                saveStateForAccount(activeAccountKey);
+                dirty = false;
+            }
+            log.info("Auto CA sync: {} task(s) synced silently on login.", newlySynced);
+        }
+    }
+
+    @Override
+    public void syncCombatAchievementsAndPersist()
+    {
+        if (!hasTaskPackLoaded())
+        {
+            chat("No tasks loaded. Load tasks first.");
+            return;
+        }
+
+        clientThread.invokeLater(() -> {
+            int newlySynced = 0;
+
+            for (XtremeTask task : tasks)
+            {
+                if (task.getSource() != TaskSource.COMBAT_ACHIEVEMENT)
+                {
+                    continue;
+                }
+
+                if (manualCompletedTaskIds.contains(task.getId()))
+                {
+                    continue;
+                }
+
+                Integer taskId = resolveCombatAchievementTaskId(task);
+                if (taskId == null)
+                {
+                    continue;
+                }
+
+                if (combatAchievementService.isTaskComplete(taskId))
+                {
+                    if (syncedCompletedTaskIds.add(task.getId()))
+                    {
+                        newlySynced++;
+                    }
+                }
+            }
+
+            rebuildTierCounts();
+            dirty = true;
+            if (activeAccountKey != null)
+            {
+                saveStateForAccount(activeAccountKey);
+                dirty = false;
+            }
+
+            chat("CA sync complete: " + newlySynced + " new tasks synced.");
+        });
+    }
+
+    @Override
+    public void syncCollectionLogsAndPersist()
+    {
+        if (!hasTaskPackLoaded())
+        {
+            chat("No tasks loaded. Load tasks first.");
+            return;
+        }
+
+        clientThread.invokeLater(() -> {
+            int newlySynced = 0;
+
+            for (XtremeTask task : tasks)
+            {
+                if (task.getSource() != TaskSource.COLLECTION_LOG)
+                {
+                    continue;
+                }
+
+                if (manualCompletedTaskIds.contains(task.getId()))
+                {
+                    continue;
+                }
+
+                TaskVerification verification = task.getVerification();
+                if (verification == null)
+                {
+                    continue;
+                }
+
+                boolean complete = false;
+
+                if (verification.getType() == TaskVerification.VerificationType.COLLECTION_LOG)
+                {
+                    ItemRequirement requirement = resolveCollectionLogRequirement(task);
+                    if (requirement != null)
+                    {
+                        complete = collectionLogService.countObtained(requirement.itemIds) >= requirement.requiredCount;
+                    }
+                }
+                else if (verification.getType() == TaskVerification.VerificationType.ACHIEVEMENT_DIARY)
+                {
+                    complete = prerequisiteTrackerService.isDiaryComplete(
+                            verification.getRegion(), verification.getDifficulty());
+                }
+                else if (verification.getType() == TaskVerification.VerificationType.SKILL
+                        && verification.getExperience() != null
+                        && verification.getCount() != null)
+                {
+                    int at99 = prerequisiteTrackerService.countSkillsAt99(verification.getExperience().keySet());
+                    complete = at99 >= verification.getCount();
+                }
+
+                if (complete && syncedCompletedTaskIds.add(task.getId()))
+                {
+                    newlySynced++;
+                }
+            }
+
+            rebuildTierCounts();
+            dirty = true;
+            if (activeAccountKey != null)
+            {
+                saveStateForAccount(activeAccountKey);
+                dirty = false;
+            }
+
+            int capturedItems = collectionLogService.getCapturedItemCount();
+            if (capturedItems == 0)
+            {
+                chat("CLOG sync complete: 0 new tasks synced. No obtained CLOG items are cached yet this session. Open Collection Log categories/pages, then sync again.");
+            }
+            else
+            {
+                chat("CLOG sync complete: " + newlySynced + " new tasks synced (" + capturedItems + " obtained CLOG items cached this session).");
+            }
+        });
+    }
+
+    @Override
+    public void debugCollectionLogCacheAndReport()
+    {
+        clientThread.invokeLater(() -> {
+            Set<Integer> cachedIds = collectionLogService.getCachedItemIds();
+            int capturedItems = cachedIds.size();
+
+            // Count how many CLOG tasks have valid (deserialized) verification requirements
+            long tasksWithClogReq = tasks.stream()
+                    .filter(t -> t.getSource() == TaskSource.COLLECTION_LOG)
+                    .filter(t -> {
+                        TaskVerification v = t.getVerification();
+                        return v != null && v.getType() == TaskVerification.VerificationType.COLLECTION_LOG
+                                && resolveCollectionLogRequirement(t) != null;
+                    })
+                    .count();
+
+            long tasksWithDiaryReq = tasks.stream()
+                    .filter(t -> t.getSource() == TaskSource.COLLECTION_LOG)
+                    .filter(t -> {
+                        TaskVerification v = t.getVerification();
+                        return v != null && v.getType() == TaskVerification.VerificationType.ACHIEVEMENT_DIARY
+                                && v.getRegion() != null && v.getDifficulty() != null;
+                    })
+                    .count();
+
+            long tasksWithSkillReq = tasks.stream()
+                    .filter(t -> t.getSource() == TaskSource.COLLECTION_LOG)
+                    .filter(t -> {
+                        TaskVerification v = t.getVerification();
+                        return v != null && v.getType() == TaskVerification.VerificationType.SKILL
+                                && v.getExperience() != null && v.getCount() != null;
+                    })
+                    .count();
+
+            long totalClogTasks = tasks.stream()
+                    .filter(t -> t.getSource() == TaskSource.COLLECTION_LOG)
+                    .count();
+
+            if (capturedItems == 0)
+            {
+                chat("CLOG debug: 0 items cached. Open the Collection Log in-game to populate."
+                        + " Tasks with requirements loaded: clog=" + tasksWithClogReq
+                        + " diary=" + tasksWithDiaryReq
+                        + " skill=" + tasksWithSkillReq + "/" + totalClogTasks + " total.");
+            }
+            else
+            {
+                chat("CLOG debug: " + capturedItems + " item(s) cached: " + cachedIds
+                        + ". Tasks with requirements loaded: clog=" + tasksWithClogReq
+                        + " diary=" + tasksWithDiaryReq
+                        + " skill=" + tasksWithSkillReq + "/" + totalClogTasks + " total.");
+            }
+        });
+    }
+
+    @Override
+    public List<PrerequisiteStatus> getPrerequisiteStatuses(XtremeTask task)
+    {
+        if (task == null || task.getPrereqs() == null)
+        {
+            return List.of();
+        }
+
+        return prerequisiteTrackerService.evaluate(task.getPrereqs());
+    }
+
     private void reloadTaskPackInternal() {
         try {
             InputStream in = XtremeTaskerPlugin.class
@@ -555,7 +827,8 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                         safeTrim(d.iconKey),
                         safeTrim(d.description),
                         safeTrim(d.prereqs),
-                        safeTrim(d.wikiUrl)
+                    safeTrim(d.wikiUrl),
+                    d.verification
                 );
 
                 if (!seenIds.add(task.getId())) {
@@ -596,6 +869,12 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             persistIfPossible();
 
             chat("Loaded " + tasks.size() + " tasks.");
+
+            // Immediately sync CA completions — varp data is always available when logged in.
+            if (client.getGameState() == GameState.LOGGED_IN)
+            {
+                silentSyncCombatAchievements();
+            }
         } catch (Exception e) {
             log.error("Failed to load embedded tasks.json", e);
             tasks.clear();
@@ -622,6 +901,107 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         String description;
         String prereqs;
         String wikiUrl;
+        TaskVerification verification;
+    }
+
+    private void loadCombatAchievementMappings()
+    {
+        caTaskIdsByName.clear();
+        caTaskIdsByNormalizedName.clear();
+
+        try (InputStream in = XtremeTaskerPlugin.class
+                .getClassLoader()
+                .getResourceAsStream("task_data/utils/add_complete_ca_mappings.py"))
+        {
+            if (in == null)
+            {
+                log.warn("Combat achievement mapping resource not found");
+                return;
+            }
+
+            String raw = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            for (String line : raw.split("\\r?\\n"))
+            {
+                Matcher matcher = CA_MAPPING_LINE.matcher(line);
+                if (!matcher.matches())
+                {
+                    continue;
+                }
+
+                String taskName = matcher.group(1).trim();
+                int taskId = Integer.parseInt(matcher.group(2));
+
+                caTaskIdsByName.put(taskName, taskId);
+                caTaskIdsByNormalizedName.put(normalizeName(taskName), taskId);
+            }
+
+            log.info("Loaded {} combat achievement name mappings", caTaskIdsByName.size());
+        }
+        catch (Exception e)
+        {
+            log.warn("Failed to load combat achievement mappings", e);
+        }
+    }
+
+    private Integer resolveCombatAchievementTaskId(XtremeTask task)
+    {
+        TaskVerification verification = task.getVerification();
+        if (verification != null
+                && verification.getType() == TaskVerification.VerificationType.COMBAT_ACHIEVEMENT
+                && verification.getTaskId() != null)
+        {
+            return verification.getTaskId();
+        }
+
+        Integer byName = caTaskIdsByName.get(task.getName());
+        if (byName != null)
+        {
+            return byName;
+        }
+
+        return caTaskIdsByNormalizedName.get(normalizeName(task.getName()));
+    }
+
+    private ItemRequirement resolveCollectionLogRequirement(XtremeTask task)
+    {
+        TaskVerification verification = task.getVerification();
+        if (verification != null
+                && verification.getType() == TaskVerification.VerificationType.COLLECTION_LOG
+                && verification.getItemIds() != null
+                && verification.getItemIds().length > 0)
+        {
+            int count = verification.getCount() == null ? 1 : Math.max(1, verification.getCount());
+            return new ItemRequirement(verification.getItemIds(), count);
+        }
+
+        if (task.getIconItemId() != null && task.getIconItemId() > 0)
+        {
+            return new ItemRequirement(new int[]{task.getIconItemId()}, 1);
+        }
+
+        return null;
+    }
+
+    private static String normalizeName(String value)
+    {
+        if (value == null)
+        {
+            return "";
+        }
+
+        return value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private static final class ItemRequirement
+    {
+        private final int[] itemIds;
+        private final int requiredCount;
+
+        private ItemRequirement(int[] itemIds, int requiredCount)
+        {
+            this.itemIds = itemIds;
+            this.requiredCount = requiredCount;
+        }
     }
 
     private void chat(String msg) {
