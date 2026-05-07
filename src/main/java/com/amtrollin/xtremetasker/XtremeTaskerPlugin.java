@@ -21,6 +21,9 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -34,8 +37,6 @@ import javax.inject.Inject;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -78,6 +79,8 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     private CombatAchievementService combatAchievementService;
     @Inject
     private PrerequisiteTrackerService prerequisiteTrackerService;
+    @Inject
+    private ChatMessageManager chatMessageManager;
 
     private final Gson gson = new GsonBuilder().create();
     private final Random random = new Random();
@@ -104,7 +107,6 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
     private final Map<String, Integer> caTaskIdsByName = new HashMap<>();
     private final Map<String, Integer> caTaskIdsByNormalizedName = new HashMap<>();
-    private static final Pattern CA_MAPPING_LINE = Pattern.compile("^\\s*\"(.+)\"\\s*:\\s*(\\d+)\\s*,?\\s*$");
 
 
     @Override
@@ -112,7 +114,6 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         log.info("Xtreme Tasker started");
 
         collectionLogService.startUp();
-        loadCombatAchievementMappings();
 
         updateOverlayState();
         rebuildTierCounts();
@@ -244,8 +245,12 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                     dirty = false;
                 }
 
-                // Auto-sync all CAs on login — varp data is always available.
-                clientThread.invokeLater(this::silentSyncCombatAchievements);
+                // Load CA name→sortId mappings from game structs, then auto-sync.
+                clientThread.invokeLater(() ->
+                {
+                    loadCombatAchievementMappings();
+                    silentSyncCombatAchievements();
+                });
             }
         }
 
@@ -487,8 +492,18 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             return;
         }
 
-        if (manualCompletedTaskIds.contains(id)) manualCompletedTaskIds.remove(id);
-        else manualCompletedTaskIds.add(id);
+        boolean wasComplete = isTaskCompleted(task);
+        if (wasComplete)
+        {
+            // Remove from both sets so the task becomes truly incomplete.
+            // (syncedCompletedTaskIds alone would keep it stuck as complete.)
+            manualCompletedTaskIds.remove(id);
+            syncedCompletedTaskIds.remove(id);
+        }
+        else
+        {
+            manualCompletedTaskIds.add(id);
+        }
 
         rebuildTierCounts();
         dirty = true;
@@ -600,6 +615,12 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         }
 
         clientThread.invokeLater(() -> {
+            // Re-load mappings if empty (e.g. struct cache was cold at login).
+            if (caTaskIdsByName.isEmpty())
+            {
+                loadCombatAchievementMappings();
+            }
+
             int newlySynced = 0;
 
             for (XtremeTask task : tasks)
@@ -904,6 +925,10 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         TaskVerification verification;
     }
 
+    // CA struct params. Source: osrs-reldo task-types.json intParamMap/stringParamMap.
+    private static final int CA_STRUCT_PARAM_NAME = 1308;
+    private static final int CA_STRUCT_PARAM_TASK_ID = 1306; // varplayer bit index (NOT sortId/display order)
+
     private void loadCombatAchievementMappings()
     {
         caTaskIdsByName.clear();
@@ -911,36 +936,61 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
         try (InputStream in = XtremeTaskerPlugin.class
                 .getClassLoader()
-                .getResourceAsStream("task_data/utils/add_complete_ca_mappings.py"))
+                .getResourceAsStream("task_data/ca_structs.json"))
         {
             if (in == null)
             {
-                log.warn("Combat achievement mapping resource not found");
+                log.warn("CA structs resource not found (task_data/ca_structs.json)");
                 return;
             }
 
-            String raw = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            for (String line : raw.split("\\r?\\n"))
+            String json = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            CaStructEntry[] entries = gson.fromJson(json, CaStructEntry[].class);
+
+            int loaded = 0;
+            for (CaStructEntry entry : entries)
             {
-                Matcher matcher = CA_MAPPING_LINE.matcher(line);
-                if (!matcher.matches())
+                net.runelite.api.StructComposition struct = client.getStructComposition(entry.structId);
+                if (struct == null)
                 {
                     continue;
                 }
 
-                String taskName = matcher.group(1).trim();
-                int taskId = Integer.parseInt(matcher.group(2));
+                String taskName = struct.getStringValue(CA_STRUCT_PARAM_NAME);
+                if (taskName == null || taskName.isEmpty())
+                {
+                    continue;
+                }
+
+                // Param 1306 is the game's internal task ID = the varplayer bit index.
+                // sortId from ca_structs.json is only display order and must NOT be used here.
+                int taskId = struct.getIntValue(CA_STRUCT_PARAM_TASK_ID);
+                if (taskId < 0)
+                {
+                    continue;
+                }
 
                 caTaskIdsByName.put(taskName, taskId);
                 caTaskIdsByNormalizedName.put(normalizeName(taskName), taskId);
+                loaded++;
             }
 
-            log.info("Loaded {} combat achievement name mappings", caTaskIdsByName.size());
+            log.info("Loaded {} combat achievement name→taskId(bit) mappings from {} structs", loaded, entries.length);
+            if (loaded == 0)
+            {
+                log.warn("CA mapping loaded 0 entries — struct cache may be cold. Mappings will be retried on next manual sync.");
+            }
         }
         catch (Exception e)
         {
             log.warn("Failed to load combat achievement mappings", e);
         }
+    }
+
+    private static final class CaStructEntry
+    {
+        int structId;
+        int sortId;
     }
 
     private Integer resolveCombatAchievementTaskId(XtremeTask task)
@@ -1005,9 +1055,10 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     }
 
     private void chat(String msg) {
-        clientThread.invokeLater(() ->
-                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "Xtreme Tasker", msg, null)
-        );
+        chatMessageManager.queue(QueuedMessage.builder()
+                .type(ChatMessageType.GAMEMESSAGE)
+                .runeLiteFormattedMessage(new ChatMessageBuilder().append(msg).build())
+                .build());
     }
 
     private static String safeTrim(String s) {
