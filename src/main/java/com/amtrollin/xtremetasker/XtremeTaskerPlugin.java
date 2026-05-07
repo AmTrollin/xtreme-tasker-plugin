@@ -6,6 +6,7 @@ import com.amtrollin.xtremetasker.models.PrerequisiteStatus;
 import com.amtrollin.xtremetasker.models.XtremeTask;
 import com.amtrollin.xtremetasker.models.persistence.PersistedState;
 import com.amtrollin.xtremetasker.models.verification.TaskVerification;
+import com.amtrollin.xtremetasker.ui.TaskHudOverlay;
 import com.amtrollin.xtremetasker.ui.XtremeTaskerOverlay;
 import com.amtrollin.xtremetasker.verification.CollectionLogService;
 import com.amtrollin.xtremetasker.verification.CombatAchievementService;
@@ -66,6 +67,8 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     @Inject
     private XtremeTaskerOverlay overlay;
     @Inject
+    private TaskHudOverlay taskHudOverlay;
+    @Inject
     private MouseManager mouseManager;
     @Inject
     private ConfigManager configManager;
@@ -116,6 +119,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         collectionLogService.startUp();
 
         updateOverlayState();
+        updateTaskHudState();
         rebuildTierCounts();
 
         if (config.showOverlay()) {
@@ -124,19 +128,24 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             mouseManager.registerMouseWheelListener(overlay.getMouseWheelListener());
         }
 
-//        String key = getAccountKey();
-//        if (key != null) {
-//            activeAccountKey = key;
-//            loadStateForAccount(activeAccountKey);
-//            persistIfPossible();
-//        }
         log.info("AccountHash at startup: state={}, hash={}",
                 client.getGameState(),
                 client.getAccountHash());
         log.info("AccountKey at startup: {}", getAccountKey());
 
-
-        clientThread.invokeLater(this::reloadTaskPackInternal);
+        clientThread.invokeLater(() -> {
+            // If the plugin is (re)started while already logged in (e.g. RuneLite auto-updates
+            // the plugin mid-session), onGameStateChanged(LOGGED_IN) will not fire again.
+            // Load account state here so progress isn't lost for the rest of the session.
+            String key = getAccountKey();
+            if (key != null && !key.equals(activeAccountKey)) {
+                activeAccountKey = key;
+                loadStateForAccount(activeAccountKey);
+                loadCombatAchievementMappings();
+                log.info("Loaded XtremeTasker state on startup (already logged in) for {}", activeAccountKey);
+            }
+            reloadTaskPackInternal();
+        });
     }
 
     @Override
@@ -150,6 +159,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         }
 
         overlayManager.remove(overlay);
+        overlayManager.remove(taskHudOverlay);
         keyManager.unregisterKeyListener(overlay.getKeyListener());
         mouseManager.unregisterMouseListener(overlay.getMouseAdapter());
         mouseManager.unregisterMouseWheelListener(overlay.getMouseWheelListener());
@@ -176,6 +186,14 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         }
     }
 
+    private void updateTaskHudState() {
+        if (config.showTaskHud()) {
+            overlayManager.add(taskHudOverlay);
+        } else {
+            overlayManager.remove(taskHudOverlay);
+        }
+    }
+
     @Subscribe
     public void onConfigChanged(ConfigChanged event) {
         if (!CONFIG_GROUP.equals(event.getGroup())) {
@@ -183,6 +201,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         }
 
         updateOverlayState();
+        updateTaskHudState();
 
         if (!config.showOverlay()) {
             keyManager.unregisterKeyListener(overlay.getKeyListener());
@@ -515,6 +534,21 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     {
         if (activeAccountKey == null)
         {
+            // getAccountHash() can return -1 when LOGGED_IN first fires.
+            // Retry here until the hash is populated so state can be loaded and saves can work.
+            if (client.getGameState() == GameState.LOGGED_IN)
+            {
+                String key = getAccountKey();
+                if (key != null)
+                {
+                    activeAccountKey = key;
+                    loadStateForAccount(activeAccountKey);
+                    dirty = false; // discard any stale dirty flag; silentSync will re-set it if needed
+                    loadCombatAchievementMappings();
+                    silentSyncCombatAchievements();
+                    log.info("Loaded XtremeTasker state on game tick (account hash became available) for {}", activeAccountKey);
+                }
+            }
             return;
         }
 

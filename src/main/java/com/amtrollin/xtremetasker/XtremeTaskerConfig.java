@@ -15,4 +15,13 @@ public interface XtremeTaskerConfig extends Config {
         return true;
     }
 
+    @ConfigItem(
+            keyName = "showTaskHud",
+            name = "Show task HUD",
+            description = "Show a small overlay in the top-left corner with your current task"
+    )
+    default boolean showTaskHud() {
+        return true;
+    }
+
 }

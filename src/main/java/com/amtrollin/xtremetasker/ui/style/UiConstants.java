@@ -17,6 +17,8 @@ public final class UiConstants
 
     public static final int ICON_BELOW_MINIMAP_ORB_EXTRA_Y = 18;
     public static final int ICON_ANCHOR_PAD = 4;
+    public static final int ICON_ANCHOR_EXTRA_DOWN = 4;
+    public static final int ICON_ANCHOR_RIGHT_OFFSET = 10;
 
     // Completion indicator sizing
     public static final int STATUS_PIP_SIZE = 9;

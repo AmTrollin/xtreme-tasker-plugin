@@ -178,7 +178,7 @@ public class XtremeTaskerOverlay extends Overlay {
         this.plugin = plugin;
 
         setPosition(OverlayPosition.DYNAMIC);
-        setLayer(OverlayLayer.ABOVE_WIDGETS);
+        setLayer(OverlayLayer.ABOVE_SCENE);
 
 // -----------------------------
 // Extracted input handlers
@@ -1039,20 +1039,25 @@ public class XtremeTaskerOverlay extends Overlay {
     }
 
     private Point computeIconPosition(int canvasWidth, int canvasHeight) {
-        Widget orb = client.getWidget(WidgetInfo.MINIMAP_WORLDMAP_ORB);
+        // Anchor to the actual minimap draw area (works across fixed, resizable-classic,
+        // and resizable-modern).  Place the button just below the map circle, left-aligned —
+        // this is inside the minimap panel frame and is consistently clear of the world-map
+        // orb, multicombat swords, and all other interface widgets in every layout mode.
+        Widget mapArea = client.getWidget(WidgetInfo.FIXED_VIEWPORT_MINIMAP_DRAW_AREA);
+        if (mapArea == null) mapArea = client.getWidget(WidgetInfo.RESIZABLE_MINIMAP_DRAW_AREA);
+        if (mapArea == null) mapArea = client.getWidget(WidgetInfo.RESIZABLE_MINIMAP_STONES_DRAW_AREA);
 
-        if (orb != null) {
-            Rectangle b = orb.getBounds();
-
-            int x = b.x + (b.width - ICON_WIDTH) / 2;
-            int y = b.y + b.height + ICON_BELOW_MINIMAP_ORB_EXTRA_Y + ICON_ANCHOR_PAD;
-
+        if (mapArea != null) {
+            Rectangle b = mapArea.getBounds();
+            // Slightly right of center and just below the draw area
+            int x = b.x + (b.width - ICON_WIDTH) / 2 + ICON_ANCHOR_RIGHT_OFFSET;
+            int y = b.y + b.height + ICON_ANCHOR_PAD + ICON_ANCHOR_EXTRA_DOWN;
             x = Math.max(0, Math.min(x, canvasWidth - ICON_WIDTH));
             y = Math.max(0, Math.min(y, canvasHeight - ICON_HEIGHT));
-
             return new Point(x, y);
         }
 
+        // Hard fallback: upper-right corner well clear of game content
         return new Point(canvasWidth - ICON_WIDTH - ICON_FALLBACK_RIGHT_MARGIN, ICON_FALLBACK_Y);
     }
 
