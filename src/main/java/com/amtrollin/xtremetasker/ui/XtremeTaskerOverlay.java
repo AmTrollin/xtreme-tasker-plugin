@@ -44,6 +44,7 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 
@@ -99,6 +100,13 @@ public class XtremeTaskerOverlay extends Overlay {
 
     private Integer panelXOverride = null;
     private Integer panelYOverride = null;
+
+    private boolean draggingIcon = false;
+    private int iconDragOffsetX = 0;
+    private int iconDragOffsetY = 0;
+    private Integer iconXOverride = null;
+    private Integer iconYOverride = null;
+    private boolean iconPositionLoaded = false;
 
     private static final int PANEL_W_TASKS = 520;
     private static final int PANEL_H_TASKS = 560;
@@ -218,6 +226,16 @@ public class XtremeTaskerOverlay extends Overlay {
     public Dimension render(Graphics2D g) {
         if (!plugin.isOverlayEnabled()) {
             return null;
+        }
+
+        // Lazy-load saved icon position (safe here — all injected fields are ready).
+        if (!iconPositionLoaded) {
+            iconPositionLoaded = true;
+            int[] savedPos = plugin.loadIconPosition();
+            if (savedPos != null) {
+                iconXOverride = savedPos[0];
+                iconYOverride = savedPos[1];
+            }
         }
 
         g.setFont(FontManager.getRunescapeSmallFont());
@@ -1022,6 +1040,45 @@ public class XtremeTaskerOverlay extends Overlay {
                 return taskDetailsPopup.toggleBounds();
             }
 
+            @Override
+            public boolean isDraggingIcon() {
+                return draggingIcon;
+            }
+
+            @Override
+            public void setDraggingIcon(boolean dragging) {
+                draggingIcon = dragging;
+            }
+
+            @Override
+            public void setIconDragOffset(int dx, int dy) {
+                iconDragOffsetX = dx;
+                iconDragOffsetY = dy;
+            }
+
+            @Override
+            public int iconDragOffsetX() {
+                return iconDragOffsetX;
+            }
+
+            @Override
+            public int iconDragOffsetY() {
+                return iconDragOffsetY;
+            }
+
+            @Override
+            public void setIconOverride(int x, int y) {
+                iconXOverride = x;
+                iconYOverride = y;
+            }
+
+            @Override
+            public void persistIconPosition() {
+                if (iconXOverride != null && iconYOverride != null) {
+                    plugin.saveIconPosition(iconXOverride, iconYOverride);
+                }
+            }
+
 
         };
     }
@@ -1035,6 +1092,9 @@ public class XtremeTaskerOverlay extends Overlay {
     }
 
     private Point computeIconPosition(int canvasWidth, int canvasHeight) {
+        if (iconXOverride != null && iconYOverride != null) {
+            return new Point(iconXOverride, iconYOverride);
+        }
         // Anchor to the actual minimap draw area (works across fixed, resizable-classic,
         // and resizable-modern).  Place the button just below the map circle, left-aligned —
         // this is inside the minimap panel frame and is consistently clear of the world-map

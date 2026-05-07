@@ -32,6 +32,7 @@ import net.runelite.client.input.KeyManager;
 import net.runelite.client.input.MouseManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.ui.overlay.OverlayManager;
 
 import javax.inject.Inject;
@@ -84,6 +85,8 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     private PrerequisiteTrackerService prerequisiteTrackerService;
     @Inject
     private ChatMessageManager chatMessageManager;
+    @Inject
+    private ItemManager itemManager;
 
     private final Gson gson = new GsonBuilder().create();
     private final Random random = new Random();
@@ -307,6 +310,27 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         return STATE_KEY_PREFIX + accountKey;
     }
 
+    // ---- Icon position persistence (global, not per-account) ----
+    private static final String ICON_X_KEY = "iconX";
+    private static final String ICON_Y_KEY = "iconY";
+
+    public void saveIconPosition(int x, int y) {
+        configManager.setConfiguration(CONFIG_GROUP, ICON_X_KEY, String.valueOf(x));
+        configManager.setConfiguration(CONFIG_GROUP, ICON_Y_KEY, String.valueOf(y));
+    }
+
+    /** Returns {x, y} if a saved position exists, otherwise null. */
+    public int[] loadIconPosition() {
+        String sx = configManager.getConfiguration(CONFIG_GROUP, ICON_X_KEY);
+        String sy = configManager.getConfiguration(CONFIG_GROUP, ICON_Y_KEY);
+        if (sx == null || sy == null) return null;
+        try {
+            return new int[]{Integer.parseInt(sx.trim()), Integer.parseInt(sy.trim())};
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private void saveStateForAccount(String accountKey) {
         if (accountKey == null) {
             return;
@@ -422,6 +446,10 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                 doneByTier.put(tier, doneByTier.getOrDefault(tier, 0) + 1);
             }
         }
+    }
+
+    public java.awt.image.BufferedImage getItemImage(int itemId) {
+        return itemManager.getImage(itemId);
     }
 
     public int getTierTotal(TaskTier tier) {
@@ -916,7 +944,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                         safeTrim(d.name),
                         d.source,
                         tier,
-                        d.iconItemId,
+                        d.iconItemId != null ? d.iconItemId : d.displayItemId,
                         safeTrim(d.iconKey),
                         safeTrim(d.description),
                         safeTrim(d.prereqs),
@@ -999,6 +1027,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         TaskTier tier;
 
         Integer iconItemId;
+        Integer displayItemId; // CLOG tasks use this field name in JSON
         String iconKey;
 
         String description;

@@ -103,4 +103,13 @@ public interface OverlayInputAccess
     Rectangle taskDetailsWikiBounds();
     Rectangle taskDetailsToggleBounds();
 
+    // Icon drag
+    boolean isDraggingIcon();
+    void setDraggingIcon(boolean dragging);
+    void setIconDragOffset(int dx, int dy);
+    int iconDragOffsetX();
+    int iconDragOffsetY();
+    void setIconOverride(int x, int y);
+    void persistIconPosition();
+
 }

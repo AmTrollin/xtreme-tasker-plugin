@@ -19,6 +19,12 @@ public final class OverlayMouseHandler extends MouseAdapter {
     private final OverlayInputAccess a;
     private final Runnable onOpenPanel; // resets scroll, clears overrides, etc.
 
+    // Transient icon press state — distinguishes click from drag.
+    private boolean pressedOnIcon = false;
+    private int iconPressX = 0;
+    private int iconPressY = 0;
+    private static final int ICON_DRAG_THRESHOLD_SQ = 25; // 5px
+
     @Override
     public MouseEvent mousePressed(MouseEvent e) {
         if (!a.plugin().isOverlayEnabled()) {
@@ -28,15 +34,12 @@ public final class OverlayMouseHandler extends MouseAdapter {
         Point p = e.getPoint();
         int button = e.getButton();
 
-        // toggle panel
+        // icon pressed — record for click-vs-drag detection
         if (button == MouseEvent.BUTTON1 && a.iconBounds().contains(p)) {
-            boolean next = !a.isPanelOpen();
-            a.setPanelOpen(next);
-
-            if (next) {
-                onOpenPanel.run();
-            }
-
+            pressedOnIcon = true;
+            iconPressX = e.getX();
+            iconPressY = e.getY();
+            a.setIconDragOffset(e.getX() - a.iconBounds().x, e.getY() - a.iconBounds().y);
             e.consume();
             return e;
         }
@@ -389,7 +392,32 @@ public final class OverlayMouseHandler extends MouseAdapter {
 
     @Override
     public MouseEvent mouseDragged(MouseEvent e) {
-        if (!a.plugin().isOverlayEnabled() || !a.isPanelOpen() || !a.isDraggingPanel()) {
+        if (!a.plugin().isOverlayEnabled()) {
+            return e;
+        }
+
+        // Icon drag
+        if (pressedOnIcon || a.isDraggingIcon()) {
+            int dx = e.getX() - iconPressX;
+            int dy = e.getY() - iconPressY;
+            if (!a.isDraggingIcon() && (dx * dx + dy * dy) < ICON_DRAG_THRESHOLD_SQ) {
+                return e; // below threshold — not a drag yet
+            }
+            a.setDraggingIcon(true);
+
+            int canvasW = a.client().getCanvasWidth();
+            int canvasH = a.client().getCanvasHeight();
+            int newX = e.getX() - a.iconDragOffsetX();
+            int newY = e.getY() - a.iconDragOffsetY();
+            newX = Math.max(0, Math.min(newX, canvasW - a.iconBounds().width));
+            newY = Math.max(0, Math.min(newY, canvasH - a.iconBounds().height));
+            a.setIconOverride(newX, newY);
+            e.consume();
+            return e;
+        }
+
+        // Panel drag
+        if (!a.isPanelOpen() || !a.isDraggingPanel()) {
             return e;
         }
 
@@ -412,6 +440,22 @@ public final class OverlayMouseHandler extends MouseAdapter {
     public MouseEvent mouseReleased(MouseEvent e) {
         if (a.isDraggingPanel()) {
             a.setDraggingPanel(false);
+            e.consume();
+        }
+        if (pressedOnIcon) {
+            if (a.isDraggingIcon()) {
+                // Drag ended — save position.
+                a.persistIconPosition();
+                a.setDraggingIcon(false);
+            } else {
+                // It was a click — toggle panel.
+                boolean next = !a.isPanelOpen();
+                a.setPanelOpen(next);
+                if (next) {
+                    onOpenPanel.run();
+                }
+            }
+            pressedOnIcon = false;
             e.consume();
         }
         return e;
