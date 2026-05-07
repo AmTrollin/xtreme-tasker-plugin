@@ -333,11 +333,6 @@ public final class OverlayMouseHandler extends MouseAdapter {
                 e.consume();
                 return e;
             }
-            if (a.rulesLayout().clogDebugButtonBounds.contains(p)) {
-                a.plugin().debugCollectionLogCacheAndReport();
-                e.consume();
-                return e;
-            }
 
             if (a.rulesLayout().taskerFaqLinkBounds.contains(p)) {
                 LinkBrowser.browse(RulesTabRenderer.taskerFaqUrl());
@@ -372,7 +367,7 @@ public final class OverlayMouseHandler extends MouseAdapter {
                                 || a.rulesLayout().reloadButtonBounds.contains(p)
                             || a.rulesLayout().syncClogsButtonBounds.contains(p)
                             || a.rulesLayout().syncCAsButtonBounds.contains(p)
-                            || a.rulesLayout().clogDebugButtonBounds.contains(p)
+
                 );
 
 

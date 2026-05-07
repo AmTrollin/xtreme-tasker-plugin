@@ -60,7 +60,6 @@ public final class RulesTabRenderer
         layout.reloadButtonBounds.setBounds(0, 0, 0, 0);
         layout.syncClogsButtonBounds.setBounds(0, 0, 0, 0);
         layout.syncCAsButtonBounds.setBounds(0, 0, 0, 0);
-        layout.clogDebugButtonBounds.setBounds(0, 0, 0, 0);
 
         int bx = panelX + panelPadding;
         int viewportY = cursorYBaseline - fm.getAscent();
@@ -98,10 +97,10 @@ public final class RulesTabRenderer
             if (LINE_DATA_SYNC_BUTTON_ROW.equals(line))
             {
                 int gap = 8;
-                int btnW = (viewportW - (gap * 3)) / 4;
+                int btnW = (viewportW - (gap * 2)) / 3;
                 int btnH = rowHeight + 10;
 
-                int totalW = (btnW * 4) + (gap * 3);
+                int totalW = (btnW * 3) + (gap * 2);
 
                 int startX = bx + (viewportW - totalW) / 2;
                 int by = drawY - fm.getAscent();
@@ -109,7 +108,6 @@ public final class RulesTabRenderer
                 layout.reloadButtonBounds.setBounds(startX, by, btnW, btnH);
                 layout.syncClogsButtonBounds.setBounds(startX + btnW + gap, by, btnW, btnH);
                 layout.syncCAsButtonBounds.setBounds(startX + (btnW * 2) + (gap * 2), by, btnW, btnH);
-                layout.clogDebugButtonBounds.setBounds(startX + (btnW * 3) + (gap * 3), by, btnW, btnH);
 
                 drawY += rb;
                 continue;

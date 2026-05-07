@@ -393,7 +393,6 @@ public class XtremeTaskerOverlay extends Overlay {
         rulesLayout.taskerFaqLinkBounds.setBounds(layout.taskerFaqLinkBounds);
         rulesLayout.syncClogsButtonBounds.setBounds(layout.syncClogsButtonBounds);
         rulesLayout.syncCAsButtonBounds.setBounds(layout.syncCAsButtonBounds);
-        rulesLayout.clogDebugButtonBounds.setBounds(layout.clogDebugButtonBounds);
 
         rulesViewportBounds.setBounds(layout.viewportBounds);
 
@@ -405,9 +404,6 @@ public class XtremeTaskerOverlay extends Overlay {
         }
         if (rulesLayout.syncCAsButtonBounds.width > 0) {
             buttonRenderer.drawButton(g, rulesLayout.syncCAsButtonBounds, "Sync CAs", true);
-        }
-        if (rulesLayout.clogDebugButtonBounds.width > 0) {
-            buttonRenderer.drawButton(g, rulesLayout.clogDebugButtonBounds, "CLOG Debug", true);
         }
 
         if (rulesLayout.taskerFaqLinkBounds.width > 0) {

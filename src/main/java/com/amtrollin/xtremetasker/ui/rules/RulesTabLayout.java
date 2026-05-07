@@ -11,6 +11,5 @@ public final class RulesTabLayout
     public final Rectangle taskerFaqButtonBounds = new Rectangle();
     public final Rectangle syncClogsButtonBounds = new Rectangle();
     public final Rectangle syncCAsButtonBounds = new Rectangle();
-    public final Rectangle clogDebugButtonBounds = new Rectangle();
 
 }

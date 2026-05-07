@@ -103,6 +103,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
     private final List<XtremeTask> tasks = new ArrayList<>();
     private boolean taskPackLoaded = false;
+    private int lastSeenPackVersion = 0;
+    /** Version of the last successfully loaded pack, independent of per-account state. */
+    private int loadedPackVersion = 0;
 
     private boolean dirty = false;
     private int flushTickCounter = 0;
@@ -171,6 +174,8 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         syncedCompletedTaskIds.clear();
 
         activeAccountKey = null;
+        lastSeenPackVersion = 0;
+        loadedPackVersion = 0;
 
         tasks.clear();
         taskPackLoaded = false;
@@ -257,6 +262,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                 loadStateForAccount(activeAccountKey);
                 log.info("Loaded XtremeTasker state for {}", activeAccountKey);
 
+                // Fire any pending version nudge now that we have the correct lastSeenPackVersion.
+                maybeFireVersionNudge();
+
                 // IMPORTANT: if user did stuff before key was ready, flush now
                 if (dirty)
                 {
@@ -314,6 +322,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         state.setManualCompletedTaskIds(new HashSet<>(manualCompletedTaskIds));
         state.setSyncedCompletedTaskIds(new HashSet<>(syncedCompletedTaskIds));
         state.setCurrentTaskId(currentTaskId);
+        state.setLastSeenPackVersion(lastSeenPackVersion);
 
         String key = stateConfigKeyForAccount(accountKey);
         configManager.setConfiguration(CONFIG_GROUP, key, gson.toJson(state));
@@ -325,6 +334,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         syncedCompletedTaskIds.clear();
         currentTask = null;
         currentTaskId = null;
+        lastSeenPackVersion = 0;
 
 
         if (accountKey == null)
@@ -354,6 +364,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                     syncedCompletedTaskIds.addAll(state.getSyncedCompletedTaskIds());
                 }
                 currentTaskId = state.getCurrentTaskId();
+                lastSeenPackVersion = state.getLastSeenPackVersion();
             }
         }
         catch (Exception e)
@@ -363,6 +374,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             syncedCompletedTaskIds.clear();
             currentTask = null;
             currentTaskId = null;
+            lastSeenPackVersion = 0;
         }
 
         resolveCurrentTaskIfPossible();
@@ -692,7 +704,11 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                 dirty = false;
             }
 
-            chat("CA sync complete: " + newlySynced + " new tasks synced.");
+            if (newlySynced > 0) {
+                chat("Combat Achievement sync done! " + newlySynced + " task(s) marked complete based on your CA progress.");
+            } else {
+                chat("Combat Achievement sync done! No new completions found.");
+            }
         });
     }
 
@@ -766,11 +782,15 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             int capturedItems = collectionLogService.getCapturedItemCount();
             if (capturedItems == 0)
             {
-                chat("CLOG sync complete: 0 new tasks synced. No obtained CLOG items are cached yet this session. Open Collection Log categories/pages, then sync again.");
+                chat("Collection Log sync done! No items are cached yet this session — open your Collection Log, then sync again.");
+            }
+            else if (newlySynced > 0)
+            {
+                chat("Collection Log sync done! " + newlySynced + " task(s) marked complete based on your collection log.");
             }
             else
             {
-                chat("CLOG sync complete: " + newlySynced + " new tasks synced (" + capturedItems + " obtained CLOG items cached this session).");
+                chat("Collection Log sync done! No new completions found (" + capturedItems + " items checked).");
             }
         });
     }
@@ -840,6 +860,24 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         }
 
         return prerequisiteTrackerService.evaluate(task.getPrereqs());
+    }
+
+    /**
+     * Sends a one-time chat nudge when the bundled task pack is newer than what the user
+     * last saw. Safe to call multiple times; only fires once per version bump.
+     * Must be called after both loadedPackVersion and lastSeenPackVersion are current.
+     */
+    private void maybeFireVersionNudge() {
+        if (loadedPackVersion == 0) return; // pack not loaded yet
+        boolean isFirstLoad = (lastSeenPackVersion == 0 && loadedPackVersion == 1);
+        log.info("maybeFireVersionNudge: loadedPackVersion={}, lastSeenPackVersion={}, isFirstLoad={}",
+                loadedPackVersion, lastSeenPackVersion, isFirstLoad);
+        if (!isFirstLoad && loadedPackVersion > lastSeenPackVersion) {
+            chat("[Xtreme Tasker] New tasks have been added! Open the task panel, reload your task list, then hit Sync to auto-complete any you've already done. Your existing progress is untouched.");
+            lastSeenPackVersion = loadedPackVersion;
+            dirty = true;
+            persistIfPossible();
+        }
     }
 
     private void reloadTaskPackInternal() {
@@ -921,6 +959,16 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             resolveCurrentTaskIfPossible();
 
             rebuildTierCounts();
+
+            loadedPackVersion = pack.version;
+
+            // Fire the version nudge if we're already logged in; otherwise onGameStateChanged
+            // will call maybeFireVersionNudge() once the account state has been loaded.
+            if (client.getGameState() == GameState.LOGGED_IN) {
+                maybeFireVersionNudge();
+            }
+
+            dirty = true;
             persistIfPossible();
 
             chat("Loaded " + tasks.size() + " tasks.");

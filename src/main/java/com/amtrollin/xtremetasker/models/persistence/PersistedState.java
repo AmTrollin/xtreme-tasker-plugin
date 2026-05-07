@@ -14,4 +14,5 @@ public class PersistedState {
     private Set<String> manualCompletedTaskIds = new HashSet<>();
     private Set<String> syncedCompletedTaskIds = new HashSet<>();
     private String currentTaskId;
+    private int lastSeenPackVersion = 0;
 }
