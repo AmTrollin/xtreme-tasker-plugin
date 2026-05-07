@@ -20,7 +20,9 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
+import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameStateChanged;
+import net.runelite.api.events.MenuOpened;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
@@ -107,6 +109,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     private final List<XtremeTask> tasks = new ArrayList<>();
     private boolean taskPackLoaded = false;
     private int lastSeenPackVersion = 0;
+    private int lastKnownTaskCount = 0;
     /** Version of the last successfully loaded pack, independent of per-account state. */
     private int loadedPackVersion = 0;
 
@@ -116,6 +119,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
     private final Map<String, Integer> caTaskIdsByName = new HashMap<>();
     private final Map<String, Integer> caTaskIdsByNormalizedName = new HashMap<>();
+
+    private long rollAnimEndMs = 0L;
+    private boolean inWorld = false;
 
 
     @Override
@@ -149,6 +155,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                 loadStateForAccount(activeAccountKey);
                 loadCombatAchievementMappings();
                 log.info("Loaded XtremeTasker state on startup (already logged in) for {}", activeAccountKey);
+            }
+            if (key != null) {
+                inWorld = true;
             }
             reloadTaskPackInternal();
         });
@@ -245,6 +254,31 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         return config.showOverlay();
     }
 
+    public boolean isLoggedIn() {
+        return inWorld;
+    }
+
+    public boolean isRolling() {
+        return System.currentTimeMillis() < rollAnimEndMs;
+    }
+
+    // ---------- right-click menu on XT icon ----------
+
+    @Subscribe
+    public void onMenuOpened(MenuOpened event) {
+        if (!isOverlayEnabled()) return;
+        net.runelite.api.Point mouse = client.getMouseCanvasPosition();
+        if (mouse == null) return;
+        java.awt.Rectangle bounds = overlay.getIconBounds();
+        if (bounds.width <= 0 || !bounds.contains(mouse.getX(), mouse.getY())) return;
+
+        client.createMenuEntry(-1)
+                .setOption("Move to original position")
+                .setTarget("<col=ff9040>XT Icon</col>")
+                .setType(MenuAction.RUNELITE)
+                .onClick(e -> overlay.resetIconPosition());
+    }
+
     // ---------- account persistence ----------
 
     @Subscribe
@@ -285,12 +319,25 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         }
 
 
-        if (gs == GameState.LOGIN_SCREEN || gs == GameState.HOPPING) {
+        if (gs == GameState.LOGGED_IN) {
+            inWorld = true;
+        }
+
+        if (gs == GameState.LOGIN_SCREEN) {
+            inWorld = false;
             if (activeAccountKey != null) {
                 saveStateForAccount(activeAccountKey);
                 log.info("Saved XtremeTasker state for {}", activeAccountKey);
             }
         }
+
+        if (gs == GameState.HOPPING) {
+            if (activeAccountKey != null) {
+                saveStateForAccount(activeAccountKey);
+                log.info("Saved XtremeTasker state for {}", activeAccountKey);
+            }
+        }
+
     }
 
     private String getAccountKey() {
@@ -317,6 +364,11 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
     public void saveIconPosition(int x, int y) {
         configManager.setConfiguration(CONFIG_GROUP, ICON_X_KEY, String.valueOf(x));
         configManager.setConfiguration(CONFIG_GROUP, ICON_Y_KEY, String.valueOf(y));
+    }
+
+    public void clearIconPosition() {
+        configManager.unsetConfiguration(CONFIG_GROUP, ICON_X_KEY);
+        configManager.unsetConfiguration(CONFIG_GROUP, ICON_Y_KEY);
     }
 
     /** Returns {x, y} if a saved position exists, otherwise null. */
@@ -347,6 +399,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         state.setSyncedCompletedTaskIds(new HashSet<>(syncedCompletedTaskIds));
         state.setCurrentTaskId(currentTaskId);
         state.setLastSeenPackVersion(lastSeenPackVersion);
+        state.setLastKnownTaskCount(lastKnownTaskCount);
 
         String key = stateConfigKeyForAccount(accountKey);
         configManager.setConfiguration(CONFIG_GROUP, key, gson.toJson(state));
@@ -389,6 +442,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
                 }
                 currentTaskId = state.getCurrentTaskId();
                 lastSeenPackVersion = state.getLastSeenPackVersion();
+                lastKnownTaskCount = state.getLastKnownTaskCount();
             }
         }
         catch (Exception e)
@@ -399,6 +453,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             currentTask = null;
             currentTaskId = null;
             lastSeenPackVersion = 0;
+            lastKnownTaskCount = 0;
         }
 
         resolveCurrentTaskIfPossible();
@@ -520,6 +575,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
         XtremeTask newTask = rollRandomTask();
         setCurrentTask(newTask);
+        rollAnimEndMs = System.currentTimeMillis() + com.amtrollin.xtremetasker.ui.style.UiConstants.ROLL_ANIM_MS;
 
         currentTaskId = (newTask != null) ? newTask.getId() : null;
         dirty = true;
@@ -532,6 +588,7 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
         if (cur == null) return;
 
         manualCompletedTaskIds.add(cur.getId());
+        clientThread.invokeLater(() -> client.playSoundEffect(3925)); // collection log new-entry ding
 
         // Clear current when done so it won't pin on restart
         currentTask = null;
@@ -910,6 +967,9 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
 
     private void reloadTaskPackInternal() {
         try {
+            final int previousKnownCount = lastKnownTaskCount;
+            final boolean isFirstLoad = (lastSeenPackVersion == 0 && loadedPackVersion == 0);
+
             InputStream in = XtremeTaskerPlugin.class
                     .getClassLoader()
                     .getResourceAsStream("task_data/tasks.json");
@@ -999,7 +1059,18 @@ public class XtremeTaskerPlugin extends Plugin implements TaskerService {
             dirty = true;
             persistIfPossible();
 
-            chat("Loaded " + tasks.size() + " tasks.");
+            int newTaskCount = tasks.size() - previousKnownCount;
+            if (isFirstLoad) {
+                chat("Loaded " + tasks.size() + " tasks.");
+            } else if (newTaskCount > 0) {
+                chat("Task list reloaded! " + newTaskCount + " new task" + (newTaskCount == 1 ? "" : "s") + " added.");
+            } else {
+                chat("Task list reloaded. Already up to date (" + tasks.size() + " tasks).");
+            }
+            // Update the known count now that user has acknowledged the reload
+            lastKnownTaskCount = tasks.size();
+            dirty = true;
+            persistIfPossible();
 
             // Immediately sync CA completions — varp data is always available when logged in.
             if (client.getGameState() == GameState.LOGGED_IN)

@@ -43,13 +43,17 @@ public class TaskHudOverlay extends Overlay {
     public TaskHudOverlay(XtremeTaskerPlugin plugin) {
         this.plugin = plugin;
         setPosition(OverlayPosition.TOP_LEFT);
-        setLayer(OverlayLayer.ABOVE_SCENE);
+        setLayer(OverlayLayer.ALWAYS_ON_TOP);
     }
+
+    private static final int WRAP_CHARS = 30;
 
     @Override
     public Dimension render(Graphics2D g) {
-        XtremeTask task = plugin.getCurrentTask();
-        String label = task != null ? task.getName() : "No task assigned";
+        if (!plugin.isLoggedIn()) return null;
+        boolean rolling = plugin.isRolling();
+        XtremeTask task = rolling ? null : plugin.getCurrentTask();
+        String label = rolling ? "Rolling..." : (task != null ? task.getName() : "No task assigned");
 
         // Resolve item sprite
         int itemId = getEffectiveItemId(task);
@@ -62,14 +66,30 @@ public class TaskHudOverlay extends Overlay {
         g.setFont(FontManager.getRunescapeFont());
         FontMetrics fm = g.getFontMetrics();
 
+        // Split label into up to two lines at a word boundary after WRAP_CHARS.
+        String line1, line2;
+        if (label.length() <= WRAP_CHARS) {
+            line1 = label;
+            line2 = null;
+        } else {
+            int split = label.lastIndexOf(' ', WRAP_CHARS);
+            if (split <= 0) split = WRAP_CHARS; // no space found — hard break
+            line1 = label.substring(0, split).trim();
+            line2 = label.substring(split).trim();
+        }
+
         String prefix = "Task: ";
         int prefixW = fm.stringWidth(prefix);
-        int textW = fm.stringWidth(label);
+        int line1W = fm.stringWidth(line1);
+        int line2W = line2 != null ? fm.stringWidth(line2) : 0;
         int textH = fm.getHeight();
+        int lineGap = 2;
 
         int spriteW = hasSprite ? SPRITE_SIZE + SPRITE_GAP : 0;
-        int boxW = spriteW + prefixW + textW + PADDING_X * 2;
-        int boxH = Math.max(textH + PADDING_Y * 2, SPRITE_SIZE + PADDING_Y * 2);
+        int textBlockW = prefixW + Math.max(line1W, line2W);
+        int textBlockH = line2 != null ? textH * 2 + lineGap : textH;
+        int boxW = spriteW + textBlockW + PADDING_X * 2;
+        int boxH = Math.max(textBlockH + PADDING_Y * 2, SPRITE_SIZE + PADDING_Y * 2);
 
         // Background
         g.setColor(P.UI_BG);
@@ -81,21 +101,29 @@ public class TaskHudOverlay extends Overlay {
 
         int textX = PADDING_X;
 
-        // Item sprite
+        // Item sprite — centered vertically
         if (hasSprite) {
             int spriteY = (boxH - SPRITE_SIZE) / 2;
             g.drawImage(cachedSprite, textX, spriteY, SPRITE_SIZE, SPRITE_SIZE, null);
             textX += SPRITE_SIZE + SPRITE_GAP;
         }
 
-        // Label: "Task: " in gold, task name in normal text
-        int baseline = (boxH - textH) / 2 + fm.getAscent();
+        // Baselines: center the text block vertically
+        int textBlockTop = (boxH - textBlockH) / 2;
+        int baseline1 = textBlockTop + fm.getAscent();
+        int baseline2 = baseline1 + textH + lineGap;
 
+        // "Task: " prefix on line 1 only, in gold
         g.setColor(P.UI_GOLD);
-        g.drawString(prefix, textX, baseline);
+        g.drawString(prefix, textX, baseline1);
 
         g.setColor(P.UI_TEXT);
-        g.drawString(label, textX + prefixW, baseline);
+        g.drawString(line1, textX + prefixW, baseline1);
+
+        if (line2 != null) {
+            // Indent line 2 to align under line 1 (past the "Task: " prefix)
+            g.drawString(line2, textX + prefixW, baseline2);
+        }
 
         return new Dimension(boxW, boxH);
     }

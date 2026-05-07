@@ -54,6 +54,7 @@ public interface OverlayInputAccess
     Rectangle iconBounds();
     Rectangle panelBounds();
     Rectangle panelDragBarBounds();
+    Rectangle panelCloseBounds();
 
     Rectangle currentTabBounds();
     Rectangle tasksTabBounds();
@@ -111,5 +112,6 @@ public interface OverlayInputAccess
     int iconDragOffsetY();
     void setIconOverride(int x, int y);
     void persistIconPosition();
+    void clearIconPosition();
 
 }

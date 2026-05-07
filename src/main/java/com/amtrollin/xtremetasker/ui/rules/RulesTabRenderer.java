@@ -60,7 +60,6 @@ public final class RulesTabRenderer
         layout.reloadButtonBounds.setBounds(0, 0, 0, 0);
         layout.syncClogsButtonBounds.setBounds(0, 0, 0, 0);
         layout.syncCAsButtonBounds.setBounds(0, 0, 0, 0);
-
         int bx = panelX + panelPadding;
         int viewportY = cursorYBaseline - fm.getAscent();
         int viewportW = panelWidth - 2 * panelPadding;

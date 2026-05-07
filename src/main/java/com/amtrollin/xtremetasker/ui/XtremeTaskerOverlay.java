@@ -76,6 +76,7 @@ public class XtremeTaskerOverlay extends Overlay {
     // ---- bounds / layout ----
     private final Rectangle panelBounds = new Rectangle();
     private final Rectangle panelDragBarBounds = new Rectangle();
+    private final Rectangle panelCloseBounds = new Rectangle();
     private final Rectangle iconBounds = new Rectangle();
 
     private final Rectangle currentTabBounds = new Rectangle();
@@ -186,7 +187,7 @@ public class XtremeTaskerOverlay extends Overlay {
         this.plugin = plugin;
 
         setPosition(OverlayPosition.DYNAMIC);
-        setLayer(OverlayLayer.ABOVE_SCENE);
+        setLayer(OverlayLayer.ALWAYS_ON_TOP);
 
 // -----------------------------
 // Extracted input handlers
@@ -210,6 +211,23 @@ public class XtremeTaskerOverlay extends Overlay {
         this.mouseWheelListener = new OverlayWheelHandler(access);
     }
 
+    /** Returns true while the roll animation is in progress. */
+    public boolean isRolling() {
+        return animations.isRolling();
+    }
+
+    /** Resets the draggable icon to its default position (clears overrides + persisted config). */
+    public void resetIconPosition() {
+        iconXOverride = null;
+        iconYOverride = null;
+        plugin.clearIconPosition();
+    }
+
+    /** Returns a snapshot of the current icon bounds for use in menu entry checks. */
+    public Rectangle getIconBounds() {
+        return new Rectangle(iconBounds);
+    }
+
     // -----------------------------
     // rowBlock accessors (for wheel)
     // -----------------------------
@@ -225,6 +243,9 @@ public class XtremeTaskerOverlay extends Overlay {
     @Override
     public Dimension render(Graphics2D g) {
         if (!plugin.isOverlayEnabled()) {
+            return null;
+        }
+        if (!plugin.isLoggedIn()) {
             return null;
         }
 
@@ -286,6 +307,22 @@ public class XtremeTaskerOverlay extends Overlay {
         int titleW = hfm.stringWidth(title);
         g.setColor(P.UI_GOLD);
         g.drawString(title, panelX + (panelWidth() - titleW) / 2, cursorY + hfm.getAscent());
+
+        // X close button in top-right of header
+        int closeSize = hfm.getHeight();
+        int closeX = panelX + panelW - PANEL_PADDING - closeSize;
+        int closeY = cursorY;
+        panelCloseBounds.setBounds(closeX, closeY, closeSize, closeSize);
+        net.runelite.api.Point rlMouse = client.getMouseCanvasPosition();
+        boolean hoveringClose = rlMouse != null && panelCloseBounds.contains(rlMouse.getX(), rlMouse.getY());
+        g.setColor(hoveringClose ? Color.WHITE : new Color(200, 200, 200, 180));
+        int cx = closeX + closeSize / 2;
+        int cy = closeY + closeSize / 2;
+        int arm = closeSize / 2 - 2;
+        g.setStroke(new BasicStroke(1.5f));
+        g.drawLine(cx - arm, cy - arm, cx + arm, cy + arm);
+        g.drawLine(cx + arm, cy - arm, cx - arm, cy + arm);
+        g.setStroke(new BasicStroke(1f));
 
         cursorY += hfm.getHeight() + 2;
 
@@ -423,7 +460,6 @@ public class XtremeTaskerOverlay extends Overlay {
         if (rulesLayout.syncCAsButtonBounds.width > 0) {
             buttonRenderer.drawButton(g, rulesLayout.syncCAsButtonBounds, "Sync CAs", true);
         }
-
         if (rulesLayout.taskerFaqLinkBounds.width > 0) {
             buttonRenderer.drawButton(g, rulesLayout.taskerFaqLinkBounds, "TaskerFAQ", true);
         }
@@ -861,6 +897,11 @@ public class XtremeTaskerOverlay extends Overlay {
             }
 
             @Override
+            public Rectangle panelCloseBounds() {
+                return panelCloseBounds;
+            }
+
+            @Override
             public Rectangle currentTabBounds() {
                 return currentTabBounds;
             }
@@ -1077,6 +1118,13 @@ public class XtremeTaskerOverlay extends Overlay {
                 if (iconXOverride != null && iconYOverride != null) {
                     plugin.saveIconPosition(iconXOverride, iconYOverride);
                 }
+            }
+
+            @Override
+            public void clearIconPosition() {
+                iconXOverride = null;
+                iconYOverride = null;
+                plugin.clearIconPosition();
             }
 
 

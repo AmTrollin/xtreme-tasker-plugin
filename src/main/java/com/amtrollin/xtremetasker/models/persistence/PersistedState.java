@@ -15,4 +15,5 @@ public class PersistedState {
     private Set<String> syncedCompletedTaskIds = new HashSet<>();
     private String currentTaskId;
     private int lastSeenPackVersion = 0;
+    private int lastKnownTaskCount = 0;
 }

@@ -44,6 +44,8 @@ public final class OverlayMouseHandler extends MouseAdapter {
             return e;
         }
 
+
+
         if (!a.isPanelOpen()) {
             return e;
         }
@@ -107,6 +109,13 @@ public final class OverlayMouseHandler extends MouseAdapter {
                 && !a.panelBounds().contains(p)) {
             a.setPanelOpen(false);
             a.setDraggingPanel(false);
+            e.consume();
+            return e;
+        }
+
+        // X close button
+        if (button == MouseEvent.BUTTON1 && a.panelCloseBounds().contains(p)) {
+            a.setPanelOpen(false);
             e.consume();
             return e;
         }
@@ -336,7 +345,6 @@ public final class OverlayMouseHandler extends MouseAdapter {
                 e.consume();
                 return e;
             }
-
             if (a.rulesLayout().taskerFaqLinkBounds.contains(p)) {
                 LinkBrowser.browse(RulesTabRenderer.taskerFaqUrl());
                 e.consume();
@@ -364,14 +372,14 @@ public final class OverlayMouseHandler extends MouseAdapter {
         Point p = e.getPoint();
 
         boolean hovering =
-                a.activeTab() == OverlayInputAccess.MainTab.RULES
+                a.panelCloseBounds().contains(p)
+                        || (a.activeTab() == OverlayInputAccess.MainTab.RULES
                         && (
                         a.rulesLayout().taskerFaqLinkBounds.contains(p)
                                 || a.rulesLayout().reloadButtonBounds.contains(p)
                             || a.rulesLayout().syncClogsButtonBounds.contains(p)
                             || a.rulesLayout().syncCAsButtonBounds.contains(p)
-
-                );
+                ));
 
 
         if (hovering && !handCursorActive)

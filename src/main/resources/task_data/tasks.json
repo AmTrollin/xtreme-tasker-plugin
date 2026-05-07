@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 9,
   "tasks": [
     {
       "id": "collection_log_easy_get-bolt-racks-from-barrows_001_0c221876a7",
@@ -2389,7 +2389,7 @@
       "source": "COLLECTION_LOG",
       "tier": "EASY",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -2421,7 +2421,7 @@
       "source": "COLLECTION_LOG",
       "tier": "EASY",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -2700,7 +2700,7 @@
       "name": "Get a Rune defender",
       "source": "COLLECTION_LOG",
       "tier": "EASY",
-      "prereqs": "A combined\u00a0Attack\u00a0and\u00a0Strength\u00a0level of at least 130 (or level 99 in either skill)",
+      "prereqs": "A combined Attack and Strength level of at least 130 (or level 99 in either skill)",
       "wikiTitle": "Rune defender",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Rune_defender",
       "verification": {
@@ -4034,7 +4034,7 @@
       "source": "COLLECTION_LOG",
       "tier": "EASY",
       "prereqs": "None",
-      "wikiTitle": "Supply crate\u00a0(Mahogany Homes)",
+      "wikiTitle": "Supply crate (Mahogany Homes)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Supply_crate_(Mahogany_Homes)",
       "verification": {
         "method": "collection-log",
@@ -5584,7 +5584,7 @@
       "prereqs": "None",
       "wikiTitle": "Not So Great After All",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Not_So_Great_After_All",
-      "description": "Not So Great After All\u00a0is an\u00a0easy combat achievement\u00a0which requires the player to finish off a\u00a0greater demon\u00a0with a\u00a0demonbane weapon."
+      "description": "Not So Great After All is an easy combat achievement which requires the player to finish off a greater demon with a demonbane weapon."
     },
     {
       "id": "combat_achievement_easy_a-greater-foe_001_274a312837",
@@ -5604,7 +5604,7 @@
       "prereqs": "None",
       "wikiTitle": "A Demon's Best Friend",
       "wikiUrl": "https://oldschool.runescape.wiki/w/A_Demon%27s_Best_Friend",
-      "description": "A Demon's Best Friend\u00a0is an\u00a0easy combat achievement\u00a0which requires the player to kill a\u00a0hellhound. Killing\u00a0Cerberus\u00a0counts for this achievement."
+      "description": "A Demon's Best Friend is an easy combat achievement which requires the player to kill a hellhound. Killing Cerberus counts for this achievement."
     },
     {
       "id": "combat_achievement_easy_king-black-dragon-novice_001_278b433a2b",
@@ -5654,7 +5654,7 @@
       "prereqs": "None",
       "wikiTitle": "Fighting as Intended",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Fighting_as_Intended",
-      "description": "Fighting as Intended\u00a0is an\u00a0easy combat achievement\u00a0which requires the player to kill\u00a0Obor\u00a0on a\u00a0free to play\u00a0world."
+      "description": "Fighting as Intended is an easy combat achievement which requires the player to kill Obor on a free to play world."
     },
     {
       "id": "combat_achievement_easy_sleeping-giant_001_4c1af25e86",
@@ -5664,7 +5664,7 @@
       "prereqs": "None",
       "wikiTitle": "Sleeping Giant",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Sleeping_Giants",
-      "description": "Sleeping Giant\u00a0is an\u00a0easy combat achievement\u00a0which requires the player to kill\u00a0Obor\u00a0whilst he is immobilized."
+      "description": "Sleeping Giant is an easy combat achievement which requires the player to kill Obor whilst he is immobilized."
     },
     {
       "id": "combat_achievement_easy_obor-novice_001_d866a8ae6e",
@@ -8764,7 +8764,7 @@
       "source": "COLLECTION_LOG",
       "tier": "MEDIUM",
       "prereqs": "Shades of Mort'ton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -8796,7 +8796,7 @@
       "source": "COLLECTION_LOG",
       "tier": "MEDIUM",
       "prereqs": "Shades of Mort'ton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -8828,7 +8828,7 @@
       "source": "COLLECTION_LOG",
       "tier": "MEDIUM",
       "prereqs": "Shades of Mort'ton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -9165,7 +9165,7 @@
       "source": "COLLECTION_LOG",
       "tier": "MEDIUM",
       "prereqs": "Big Chompy Bird Hunting quest; 5 Fletching; 30 Cooking; 30 Ranged",
-      "wikiTitle": "Chompy bird hat\u00a0(ogre forester)",
+      "wikiTitle": "Chompy bird hat (ogre forester)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Chompy_bird_hat_(ogre_forester)",
       "verification": {
         "method": "collection-log",
@@ -9200,7 +9200,7 @@
       "name": "Get a Dragon defender",
       "source": "COLLECTION_LOG",
       "tier": "MEDIUM",
-      "prereqs": "A combined\u00a0Attack\u00a0and\u00a0Strength\u00a0level of at least 130 (or level 99 in either skill)",
+      "prereqs": "A combined Attack and Strength level of at least 130 (or level 99 in either skill)",
       "wikiTitle": "Dragon defender",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Dragon_defender",
       "verification": {
@@ -12471,7 +12471,7 @@
       "prereqs": "None",
       "wikiTitle": "Obor Champion",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Obor_Champion",
-      "description": "Obor Champion\u00a0is a\u00a0medium combat achievement\u00a0which requires the player to kill\u00a0Obor\u00a0and open his\u00a0chest\u00a05 times."
+      "description": "Obor Champion is a medium combat achievement which requires the player to kill Obor and open his chest 5 times."
     },
     {
       "id": "combat_achievement_medium_squashing-the-giant_001_850cc2c2ab",
@@ -12481,7 +12481,7 @@
       "prereqs": "None",
       "wikiTitle": "Squashing the Giant",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Squashing_the_Giant",
-      "description": "Squashing the Giant\u00a0is a\u00a0medium combat achievement\u00a0which requires the player to kill\u00a0Obor\u00a0without taking any damage off prayer."
+      "description": "Squashing the Giant is a medium combat achievement which requires the player to kill Obor without taking any damage off prayer."
     },
     {
       "id": "combat_achievement_medium_back-to-the-wall_001_26ecb7509f",
@@ -12641,7 +12641,7 @@
       "prereqs": "50 Firemaking",
       "wikiTitle": "Can We Fix It?",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Can_We_Fix_It%3F",
-      "description": "Can We Fix It?\u00a0is a\u00a0medium combat achievement\u00a0which requires the player to subdue the\u00a0Wintertodt\u00a0without allowing all 4\u00a0braziers\u00a0to be broken at the same time."
+      "description": "Can We Fix It? is a medium combat achievement which requires the player to subdue the Wintertodt without allowing all 4 braziers to be broken at the same time."
     },
     {
       "id": "combat_achievement_medium_wintertodt-champion_001_8e82e861dd",
@@ -17794,7 +17794,7 @@
       "source": "COLLECTION_LOG",
       "tier": "HARD",
       "prereqs": "Big Chompy Bird Hunting quest; 5 Fletching; 30 Cooking; 30 Ranged",
-      "wikiTitle": "Chompy bird hat\u00a0(ogre expert)",
+      "wikiTitle": "Chompy bird hat (ogre expert)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Chompy_bird_hat_(ogre_expert)",
       "verification": {
         "method": "collection-log",
@@ -19030,7 +19030,7 @@
       "source": "COLLECTION_LOG",
       "tier": "HARD",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -19062,7 +19062,7 @@
       "source": "COLLECTION_LOG",
       "tier": "HARD",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -21132,7 +21132,7 @@
       "prereqs": "75 Slayer",
       "wikiTitle": "Prison Break",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Prison_Break",
-      "description": "Prison Break\u00a0is a\u00a0hard combat achievement\u00a0which requires the player to kill the\u00a0Grotesque Guardians\u00a0without taking damage from\u00a0Dusk's\u00a0prison attack."
+      "description": "Prison Break is a hard combat achievement which requires the player to kill the Grotesque Guardians without taking damage from Dusk's prison attack."
     },
     {
       "id": "combat_achievement_hard_static-awareness_001_73cadec9b6",
@@ -28120,7 +28120,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "None",
-      "wikiTitle": "Decorative boots\u00a0(gold)",
+      "wikiTitle": "Decorative boots (gold)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Decorative_boots_(gold)",
       "verification": {
         "method": "collection-log",
@@ -28386,7 +28386,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Big Chompy Bird Hunting quest; 5 Fletching; 30 Cooking; 30 Ranged",
-      "wikiTitle": "Chompy bird hat\u00a0(dragon archer)",
+      "wikiTitle": "Chompy bird hat (dragon archer)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Chompy_bird_hat_(dragon_archer)",
       "verification": {
         "method": "collection-log",
@@ -28422,7 +28422,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Big Chompy Bird Hunting quest; 5 Fletching; 30 Cooking; 30 Ranged",
-      "wikiTitle": "Chompy bird hat\u00a0(dragon archer)",
+      "wikiTitle": "Chompy bird hat (dragon archer)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Chompy_bird_hat_(dragon_archer)",
       "verification": {
         "method": "collection-log",
@@ -29115,7 +29115,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -29147,7 +29147,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -29179,7 +29179,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -29211,7 +29211,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -29243,7 +29243,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -29275,7 +29275,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -29307,7 +29307,7 @@
       "source": "COLLECTION_LOG",
       "tier": "ELITE",
       "prereqs": "Shades of Morton quest; 20 Crafting; 15 Herblore; 5 Firemaking",
-      "wikiTitle": "Shades of Mort'ton\u00a0(minigame)",
+      "wikiTitle": "Shades of Mort'ton (minigame)",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Shades_of_Mort%27ton_(minigame)",
       "verification": {
         "method": "collection-log",
@@ -31335,7 +31335,7 @@
       "prereqs": "91 Slayer",
       "wikiTitle": "Ghost Buster",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Ghost_Buster",
-      "description": "Ghost Buster\u00a0is an\u00a0elite combat achievement\u00a0which requires the player to kill\u00a0Cerberus\u00a0after successfully negating 6 or more attacks from\u00a0Summoned Souls."
+      "description": "Ghost Buster is an elite combat achievement which requires the player to kill Cerberus after successfully negating 6 or more attacks from Summoned Souls."
     },
     {
       "id": "combat_achievement_elite_cerberus-veteran_001_731b3cb13b",
@@ -31645,7 +31645,7 @@
       "prereqs": "None",
       "wikiTitle": "Toppling the Diarchy",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Toppling_the_Diarchy",
-      "description": "Toppling the Diarchy\u00a0is an\u00a0elite combat achievement\u00a0which requires the player to kill\u00a0Dagannoth Rex\u00a0and one other\u00a0Dagannoth king\u00a0at the exact same time."
+      "description": "Toppling the Diarchy is an elite combat achievement which requires the player to kill Dagannoth Rex and one other Dagannoth king at the exact same time."
     },
     {
       "id": "combat_achievement_elite_death-to-the-warrior-king_001_b9a2b53f07",
@@ -31665,7 +31665,7 @@
       "prereqs": "None",
       "wikiTitle": "Rapid Succession",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Rapid_Succession",
-      "description": "Rapid Succession\u00a0is an\u00a0elite combat achievement\u00a0which requires the player to kill all three\u00a0Dagannoth Kings\u00a0within 9 seconds of the first one. Ironmen cannot use main accounts to help tank the Kings to complete this challenge."
+      "description": "Rapid Succession is an elite combat achievement which requires the player to kill all three Dagannoth Kings within 9 seconds of the first one. Ironmen cannot use main accounts to help tank the Kings to complete this challenge."
     },
     {
       "id": "combat_achievement_elite_death-to-the-archer-king_001_0e97aa92a2",
@@ -39983,7 +39983,7 @@
       "prereqs": "Song of the Elves quest; 70 Agility; 70 Construction; 70 Farming; 70 Herblore; 70 Hunter; 70 Mining; 70 Smithing; 70 Woodcutting",
       "wikiTitle": "Corrupted Warrior",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Corrupted_Warrior",
-      "description": "Corrupted Warrior\u00a0is a\u00a0master combat achievement\u00a0which requires the player to kill the\u00a0Corrupted Hunllef\u00a0with a full set of\u00a0perfected corrupted armour\u00a0equipped."
+      "description": "Corrupted Warrior is a master combat achievement which requires the player to kill the Corrupted Hunllef with a full set of perfected corrupted armour equipped."
     },
     {
       "id": "combat_achievement_master_corrupted-gauntlet-speed-chaser_001_bf0af986df",
@@ -40143,7 +40143,7 @@
       "prereqs": "Children of the Sun quest",
       "wikiTitle": "One-off",
       "wikiUrl": "https://oldschool.runescape.wiki/w/One-off",
-      "description": "One-off\u00a0is a\u00a0master combat achievement\u00a0which requires the player to complete wave 11 of the\u00a0Fortis Colosseum\u00a0with either the 'Red Flag', 'Dynamic Duo', or 'Doom II'\u00a0handicaps\u00a0active."
+      "description": "One-off is a master combat achievement which requires the player to complete wave 11 of the Fortis Colosseum with either the 'Red Flag', 'Dynamic Duo', or 'Doom II' handicaps active."
     },
     {
       "id": "combat_achievement_master_colosseum-speed-chaser_001_7facf159b9",
@@ -40173,7 +40173,7 @@
       "prereqs": "Children of the Sun quest",
       "wikiTitle": "I Brought Mine Too",
       "wikiUrl": "https://oldschool.runescape.wiki/w/I_Brought_Mine_Too",
-      "description": "I Brought Mine Too\u00a0is a\u00a0master combat achievement\u00a0which requires the player to defeat\u00a0Sol Heredit\u00a0using any\u00a0spear,\u00a0hasta, or\u00a0halberd."
+      "description": "I Brought Mine Too is a master combat achievement which requires the player to defeat Sol Heredit using any spear, hasta, or halberd."
     },
     {
       "id": "combat_achievement_master_sportsmanship_001_3773b340d8",
@@ -40473,7 +40473,7 @@
       "prereqs": "None",
       "wikiTitle": "Precise Positioning",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Precise_Positioning",
-      "description": "Precise Positioning\u00a0is a\u00a0master combat achievement\u00a0which requires the player to kill\u00a0Skotizo\u00a0with the final source of damage being a\u00a0chinchompa\u00a0explosion."
+      "description": "Precise Positioning is a master combat achievement which requires the player to kill Skotizo with the final source of damage being a chinchompa explosion."
     },
     {
       "id": "combat_achievement_master_is-it-a-bird_001_3481277078",
@@ -41253,7 +41253,7 @@
       "prereqs": "95 Slayer",
       "wikiTitle": "Alchemical Speed-Runner",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Alchemical_Speed-Runner",
-      "description": "Alchemical Speed-Runner\u00a0is a\u00a0grandmaster combat achievement\u00a0which requires the player to kill the\u00a0Alchemical Hydra\u00a0in under 1 minute and 20 seconds."
+      "description": "Alchemical Speed-Runner is a grandmaster combat achievement which requires the player to kill the Alchemical Hydra in under 1 minute and 20 seconds."
     },
     {
       "id": "combat_achievement_master_no-pressure_001_160e98fcc6",
@@ -41713,7 +41713,7 @@
       "prereqs": "All GWD Frozen Key Pieces",
       "wikiTitle": "Nex Duo",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Nex_Duo",
-      "description": "Nex Duo\u00a0is a\u00a0grandmaster combat achievement\u00a0which requires players to kill\u00a0Nex\u00a0with only two or less players."
+      "description": "Nex Duo is a grandmaster combat achievement which requires players to kill Nex with only two or less players."
     },
     {
       "id": "combat_achievement_master_perfect-nex_001_6339e03f1b",
@@ -42454,6 +42454,94 @@
       "wikiTitle": "Zulrah Speed-Runner",
       "wikiUrl": "https://oldschool.runescape.wiki/w/Zulrah_Speed-Runner",
       "description": "Zulrah Speed-Runner is a grandmaster combat achievement which requires the player to kill Zulrah in less than 54 seconds without having it assigned as a slayer task."
+    },
+    {
+      "id": "test_fake_task_001",
+      "name": "TEST: Slay a fake dragon",
+      "source": "COLLECTION_LOG",
+      "tier": "EASY",
+      "prereqs": null,
+      "tip": "This is a fake test task",
+      "wikiTitle": "Dragon",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Dragon",
+      "displayItemId": 1149
+    },
+    {
+      "id": "test_fake_task_002",
+      "name": "TEST: Get a fake dragon bone",
+      "source": "COLLECTION_LOG",
+      "tier": "MEDIUM",
+      "prereqs": null,
+      "tip": "Another fake test task",
+      "wikiTitle": "Dragon bones",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Dragon_bones",
+      "displayItemId": 536
+    },
+    {
+      "id": "test_fake_task_003",
+      "name": "TEST: Catch a fake karambwan",
+      "source": "COLLECTION_LOG",
+      "tier": "HARD",
+      "prereqs": null,
+      "tip": "Fake test task 3",
+      "wikiTitle": "Raw karambwan",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Raw_karambwan",
+      "displayItemId": 3142
+    },
+    {
+      "id": "test_fake_task_004",
+      "name": "TEST: Smith a fake rune platebody",
+      "source": "COLLECTION_LOG",
+      "tier": "ELITE",
+      "prereqs": null,
+      "tip": "Fake test task 4",
+      "wikiTitle": "Rune platebody",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Rune_platebody",
+      "displayItemId": 1127
+    },
+    {
+      "id": "test_fake_task_005",
+      "name": "TEST: Brew a fake saradomin brew",
+      "source": "COLLECTION_LOG",
+      "tier": "EASY",
+      "prereqs": null,
+      "tip": "Fake test task 5",
+      "wikiTitle": "Saradomin brew",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Saradomin_brew",
+      "displayItemId": 6685
+    },
+    {
+      "id": "test_fake_task_006",
+      "name": "TEST: Catch a fake chinchompa",
+      "source": "COLLECTION_LOG",
+      "tier": "MEDIUM",
+      "prereqs": null,
+      "tip": "Fake test task 6",
+      "wikiTitle": "Chinchompa",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Chinchompa",
+      "displayItemId": 10033
+    },
+    {
+      "id": "test_fake_task_007",
+      "name": "TEST: Mine a fake runite ore",
+      "source": "COLLECTION_LOG",
+      "tier": "HARD",
+      "prereqs": null,
+      "tip": "Fake test task 7",
+      "wikiTitle": "Runite ore",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Runite_ore",
+      "displayItemId": 451
+    },
+    {
+      "id": "test_fake_task_008",
+      "name": "TEST: Fletch a fake magic longbow",
+      "source": "COLLECTION_LOG",
+      "tier": "ELITE",
+      "prereqs": null,
+      "tip": "Fake test task 8",
+      "wikiTitle": "Magic longbow",
+      "wikiUrl": "https://oldschool.runescape.wiki/w/Magic_longbow",
+      "displayItemId": 859
     }
   ]
 }

@@ -12,4 +12,5 @@ public final class RulesTabLayout
     public final Rectangle syncClogsButtonBounds = new Rectangle();
     public final Rectangle syncCAsButtonBounds = new Rectangle();
 
+
 }
